@@ -232,3 +232,170 @@ GraphQL 주의:
 - introspection으로 스키마 노출 주의
 
 경험 서술: "공개 API는 REST로 두되, 내부 마이크로서비스 간은 gRPC로 바꿔 지연을 줄였고, 프론트가 필요 데이터만 가져가도록 BFF에 GraphQL을 얹었다. GraphQL은 N+1이 터져 DataLoader로 배치 처리했다."
+
+---
+
+## 10. PuTTY / PEM 키 / keygen (서버 접속)
+정의: 클라우드 서버는 비번 아닌 키페어(.pem)로 접속(SSH 공개키 인증). 개인키 가진 사람만 통과.
+Windows PuTTY: AWS는 .pem(OpenSSH) 제공, PuTTY는 .ppk만 씀 → PuTTYgen으로 pem→ppk 변환 후 등록. 리눅스/맥은 ssh -i key.pem user@IP 바로.
+★ 함정:
+- pem 권한 너무 열리면 거부 → chmod 400 key.pem
+- 유저명 AMI마다 다름: Amazon Linux=ec2-user, Ubuntu=ubuntu, CentOS=centos
+- pem 분실 시 복구 불가 → 인스턴스 키 재설정
+경험: "EC2에 PuTTYgen으로 pem→ppk 변환 등록, ubuntu 유저·400 권한 이슈 해결."
+
+## 11. WAS / DB 서버 분리 (3-tier)
+구성: [웹 Nginx 퍼블릭]→[WAS Tomcat/gunicorn 프라이빗]→[DB 프라이빗, 외부차단]
+왜 분리:
+- 보안: DB를 프라이빗 서브넷, WAS만 접근
+- 확장: WAS는 스케일아웃, DB는 별도 증설/복제
+- 장애 격리: 웹 죽어도 DB 살아있음
+★ 방화벽 규칙이 여기서 나옴:
+- 웹: 인바운드 80/443만
+- WAS: 웹에서 오는 것만(8080), 외부 차단
+- DB: WAS 보안그룹에서 오는 3306만, 나머지 차단
+경험: "DB는 WAS 보안그룹발 3306만 허용, 나머지 차단."
+
+## 12. 인바운드/아웃바운드/방화벽/UFW
+정의: 인바운드=들어오는(외부→서버), 아웃바운드=나가는(서버→외부). 방화벽이 규칙으로 통제.
+기본 정책: 잘된 방화벽은 인바운드 기본 차단(deny)+필요 포트만 허용(화이트리스트). 아웃바운드는 보통 허용, 강한 환경은 제한(유출 방지).
+UFW 실무:
+  ufw default deny incoming / ufw default allow outgoing
+  ufw allow 22/tcp / ufw allow 80,443/tcp
+  ufw allow from 10.0.1.5 to any port 3306  (특정 IP만 DB)
+  ufw enable / ufw status verbose
+★ 함정:
+- enable 전에 22(SSH) 먼저 허용 안 하면 자기 접속 끊김(흔한 사고)
+- 클라우드는 2중 방화벽: UFW + 보안그룹. 둘 다 열어야. "UFW 열었는데 안 됨"→보안그룹 확인.
+경험: "DB UFW로 WAS발 3306만, 보안그룹까지 이중으로 맞춤."
+
+## 13. 웹 스크래핑
+정의: 웹 데이터를 프로그램으로 수집. HTTP 요청→HTML 파싱→추출.
+갈림:
+- 정적: HTML에 데이터 있음 → requests+BeautifulSoup, 빠름
+- 동적(SPA): JS가 데이터 채움 → HTML 텅 빔 → Selenium/Playwright로 JS 실행 후 수집(느림)
+★ 실무 이슈:
+- robots.txt/약관 확인(법적·윤리)
+- Rate limit: 너무 빠르면 429/IP밴 → 딜레이·지수 백오프
+- User-Agent/헤더 설정(봇 차단 회피)
+- ★ 고급팁: "브라우저엔 보이는데 requests엔 안 잡힘"→JS 렌더링. 개발자도구 Network에서 실제 데이터 API(XHR)를 찾아 직접 호출하면 Selenium보다 훨씬 빠름.
+경험: "동적 페이지라 백엔드 XHR API 직접 호출로 Selenium 없이 수집, 지수 백오프 적용."
+
+## 14. CORS
+정의: 브라우저가 다른 출처(스킴+호스트+포트) 리소스 접근을 제어하는 보안 장치. 동일 출처 정책(SOP) 완화.
+★ 출처 = 스킴+호스트+포트 셋 다 같아야 동일. 하나라도 다르면 교차 출처.
+- https://example.com vs http://example.com → 스킴 다름 ❌
+- example.com vs api.example.com → 호스트 다름 ❌
+- localhost:3000 vs localhost:8000 → 포트 다름 ❌ (경로만 다른 건 같은 출처 ✅)
+★ "같은 호스트 다른 포트"도 다른 출처 → CORS 막힘. localhost:3000(프론트)→localhost:8000(API)이 개발 최다 사례. "localhost인데 왜 CORS?" = 브라우저가 포트까지 봄.
+해결: ①서버가 Allow-Origin에 프론트 출처 명시 ②프론트 개발서버 proxy로 같은 출처처럼 위장(CORS 자체 회피, React proxy/Vite server.proxy). 배포 시 같은 도메인 뒤 경로로 나눠(example.com=프론트, example.com/api=백엔드) CORS 회피 가능(리버스 프록시 원리).
+★ 핵심 오해: CORS 에러는 서버가 아니라 "브라우저"가 막는 것. 서버는 정상 응답했지만 브라우저가 JS에 안 넘김. → curl/Postman은 되는데 브라우저만 실패 = CORS 시그니처.
+Preflight(예비 요청):
+- 위험 가능 요청 전 OPTIONS로 "허용돼?" 먼저 물음.
+- 단순 요청(preflight 없음): 메서드 GET/HEAD/POST + Content-Type이 form-urlencoded/multipart/text-plain 중 하나 + 커스텀 헤더 없음.
+- ★ application/json이면 조건 위반 → 무조건 preflight. Authorization 등 커스텀 헤더도 유발. 즉 요즘 JSON API는 대부분 OPTIONS 먼저 날아감.
+서버 응답 헤더:
+  Access-Control-Allow-Origin: https://myapp.com (credentials와 * 동시 불가)
+  Access-Control-Allow-Methods / Allow-Headers
+  Access-Control-Allow-Credentials: true (쿠키 보낼 때)
+  Access-Control-Max-Age: 86400 (preflight 캐싱, 성능↑)
+★ 흔한 실수:
+- credentials 쓰며 Allow-Origin:* → 동작 안 함, 구체 출처 명시
+- 서버가 OPTIONS 처리 안 함(404/405) → preflight 실패 → 실제 요청 차단
+- Max-Age 없어 매번 preflight → 성능 저하
+경험: "JSON API마다 preflight 떠서 서버 OPTIONS 처리+구체 출처+credentials true로 해결, Max-Age로 캐싱."
+
+## 15. 트래픽 핸들링 (부하 대응)
+정의: 몰리는 트래픽을 안정적으로 처리·분산·보호.
+계층별 도구:
+- 로드밸런싱: L4(IP/포트) / L7(URL/헤더). 라운드로빈/least_conn/IP해시
+- 오토스케일링: 부하 따라 서버 수 자동 증감
+- 캐싱: CDN(정적)/Redis(동적·세션)/HTTP 캐시헤더 → 원본 부하↓
+- Rate limiting: 초당 요청 제한, 남용·DoS 방어(429)
+- 큐잉: 급증을 Kafka/RabbitMQ로 완충 → 소화 가능 속도로 처리(backpressure)
+- Circuit Breaker: 뒤 서비스 죽으면 빠르게 실패시켜 연쇄 장애 방지
+- Graceful degradation: 과부하 시 핵심만 유지
+★ 사고 흐름: 캐싱으로 원본 부하↓ → LB+오토스케일 수평확장 → 쓰기는 큐 완충 → 남용은 rate limit → 뒤 장애는 circuit breaker. 한 방법 아닌 "계층별 방어선" 겹치기.
+경험: "이벤트 급증에 CDN으로 정적 부하 제거, WAS 오토스케일, 주문 쓰기는 Kafka 완충, 결제 외부API엔 circuit breaker로 연쇄 장애 차단."
+
+## 16. 캐싱 실제 구현 (NestJS)
+세 계층: [CDN 엣지]→[브라우저/HTTP캐시]→[NestJS+Redis]→[DB]. 바깥에서 막을수록 원본 부하↓.
+
+### (1) HTTP 캐시 헤더 — 브라우저/CDN이 캐싱하게
+@Header('Cache-Control', 'public, max-age=3600') 를 GET에 부여.
+- public=CDN·프록시도 캐싱 / private=브라우저만(사용자별) / no-cache=캐싱하되 매번 검증 / no-store=절대 금지(민감)
+- ETag: Nest(Express) 기본 생성. If-None-Match로 안 바뀌면 304 Not Modified(본문 없음)→대역폭 절약.
+
+### (2) Redis — 서버사이드 캐싱 (@nestjs/cache-manager)
+설정: CacheModule.registerAsync + redisStore(host/port, ttl).
+방법A 자동(인터셉터): @UseInterceptors(CacheInterceptor) + @CacheTTL(300_000). URL을 키로 GET 응답 통째 캐싱.
+방법B 수동(cache-aside, 가장 흔함):
+  const cached = await cache.get(key); if(cached) return cached;
+  const data = await repo.find(); await cache.set(key, data, ttl); return data;
+  ★ 변경 시 무효화: await cache.del(`product:${id}`) — 안 하면 옛 데이터 노출.
+세션: 서버 여러 대면 메모리 세션 불가(서버1 로그인→서버2 요청 시 세션 없음)→Redis로 외부화(상태 외부화).
+
+### (3) CDN — Nest 바깥 인프라 계층
+코드 아님. Nest가 할 일은 올바른 Cache-Control 내려주기. CDN(CloudFront/Cloudflare)이 헤더 보고 엣지에 캐싱.
+
+### 흔한 실수(★)
+- 무효화 누락: 데이터 바꿨는데 캐시 안 지워 옛 데이터 노출.
+- 사용자별 데이터를 public 캐싱 → CDN이 캐싱해 남에게 노출. 반드시 private.
+- Cache Stampede: 인기 키 동시 만료 → 요청 한꺼번에 DB로. TTL 지터/잠금으로 완화.
+경험: "상품 조회 API는 CacheInterceptor로 Redis 캐싱, 수정 시 del로 무효화. 세션은 Redis 외부화, 정적은 Cache-Control 길게 줘 CDN 엣지 처리. 사용자별 데이터가 CDN 캐싱되던 사고를 private로 해결."
+
+## 17. AWS 실무 핵심 개념
+전체 그림: [사용자]→IGW→[퍼블릭:ALB/웹]→(SG 참조)→[프라이빗:WAS]→(Role로 S3)→[프라이빗:DB]. IAM이 "누가 조작"을 감싸고 SG/NACL이 트래픽 통제.
+
+### IAM (누가 무엇을)
+정의: AWS 리소스 접근 권한 통제. SG/NACL=트래픽, IAM=AWS 작업 권한.
+4요소: User(장기 자격증명) / Group(User 묶음+정책) / Role(임시 자격증명, assume) / Policy(권한 정의 JSON).
+★ User보다 Role: 액세스 키(User)=유출 위험 장기 자격. Role=임시라 안전. EC2→S3 접근 시 키 하드코딩 말고 Instance Profile(Role)로 → AWS가 임시 키 자동 발급·순환.
+Policy 예: {Effect:Allow, Action:["s3:GetObject"], Resource:"arn:aws:s3:::bucket/*"}
+★ 평가 규칙: 명시적 Deny > Allow / Allow 없으면 암묵적 Deny / 최소 권한 원칙(Admin 남발 금지).
+
+### SG vs NACL vs IAM (세 방어선)
+- SG: 인스턴스 레벨, Allow만, Stateful(인바운드 허용 시 응답 자동 허용)
+- NACL: 서브넷 레벨, Allow+Deny, Stateless(응답용 아웃바운드 따로 열어야, ephemeral 포트 함정)
+- IAM: AWS API/리소스 작업 권한
+★ 킬러: "SG는 인스턴스 방화벽+stateful라 응답 자동 허용, NACL은 서브넷 방화벽+stateless라 양방향 다 열어야, IAM은 트래픽 아닌 AWS 작업 권한."
+
+### VPC / 서브넷 / 화이트리스트
+정의: VPC=AWS 안 격리된 가상 네트워크. 3-tier가 여기 올라감.
+- 퍼블릭 서브넷: 라우팅이 IGW 가리킴 → 외부 통신. 웹/LB/NAT.
+- 프라이빗 서브넷: IGW 없음 → DB 숨김. 나갈 땐 NAT 게이트웨이(아웃바운드만).
+★ 화이트리스트: IP 하드코딩 대신 SG가 다른 SG 참조. "DB SG는 WAS SG발 3306만" → 오토스케일로 늘어도 IP 수정 불필요. IP 아닌 "역할(SG) 단위".
+
+### VPN 설정
+정의: 온프레미스/원격을 VPC에 안전 연결.
+- Site-to-Site: 회사 DC↔VPC 암호화 터널
+- Client VPN: 개별 사용자→VPC(원격근무자가 프라이빗 DB 접근)
+대안: 베스천 호스트(점프 서버 SSH 경유) / SSM Session Manager(22 포트 안 열고 접속, 요즘 정석, 공격면 축소).
+
+### S3 객체 생성/가져오기 (SDK v3)
+정의: S3=객체 스토리지. 파일(객체)을 버킷에.
+Node/Nest:
+  const s3 = new S3Client({ region }); // 키 안 박음, EC2 Role 자동
+  await s3.send(new PutObjectCommand({Bucket,Key,Body,ContentType})); // 업로드
+  await s3.send(new GetObjectCommand({Bucket,Key})); // 가져오기
+★ 포인트:
+- Presigned URL: 서버가 임시 서명 URL 발급→클라가 서버 안 거치고 S3 직접 업/다운. 대용량 서버 부하 회피. 면접 단골.
+- 자격증명 코드에 없음: S3Client에 region만, Role 임시 키를 SDK가 자동 사용(IAM Role 실활용).
+- 버킷 정책 vs IAM 정책: 접근은 IAM(누가)+버킷정책(리소스측) 양쪽. 퍼블릭 노출 사고 다발.
+
+면접 한 문장: "VPC에 퍼블릭/프라이빗 나눠 DB를 프라이빗에 숨기고, SG를 IP 아닌 SG 참조로 화이트리스트해 오토스케일 대응. 권한은 IAM으로, EC2는 키 대신 Role로 S3 접근해 유출 위험 제거."
+
+## 17-B. AWS 네트워크 최소→하나씩 쌓기 (학습 순서)
+각 단계 = 앞 단계의 한계 → 추가 → 연결 개념.
+
+0. 빈 계정: 목표=웹서비스 안전하게 올리기.
+1. VPC: 격리된 내 네트워크 상자. CIDR 10.0.0.0/16(사설 대역). 아직 외부 단절.
+2. 서브넷: VPC를 칸막이. 퍼블릭 10.0.1.0/24 + 프라이빗 10.0.2.0/24. 이름만 나눔(아직 외부연결 없음). (실무: Multi-AZ로 고가용성)
+3. IGW+라우팅: 밖으로 나가는 문. 퍼블릭 라우팅 0.0.0.0/0→IGW. ★이 라우팅이 있어야 진짜 퍼블릭. 프라이빗은 이 경로 없어 자동 격리 = 퍼블릭/프라이빗 실체.
+4. Security Group: 인스턴스 문단속(최소 방화벽). 웹 SG 인바운드 443/80 from 0.0.0.0/0, 22 from 내IP. stateful이라 응답 자동. → 여기까지가 "웹 한 대 안전 노출" 최소 구성.
+5. DB 프라이빗+SG 참조: DB를 프라이빗에, DB SG 인바운드 3306 from [WAS-SG]. IP 아닌 SG 참조 → 오토스케일 대응. 역할 단위 화이트리스트 완성.
+6. NAT 게이트웨이: 프라이빗도 나가야(업데이트/외부API). 프라이빗 라우팅 0.0.0.0/0→NAT. 나가기만, 들어오긴 못함(비대칭 통로). NAT 원리.
+7. IAM Role: WAS가 S3 접근. 키 하드코딩 대신 Instance Profile(Role) → SDK 임시 키 자동. 트래픽(SG)과 별개로 "누가 무슨 작업"을 IAM이 감쌈.
+8+. 필요시: ALB(분산)/NACL(서브넷 방어,stateless)/Multi-AZ(고가용성)/VPN·SSM(관리접속)/CloudFront+Route53(CDN·DNS).
+
+한 문장: "VPC로 격리→퍼블릭/프라이빗 분할→퍼블릭은 IGW 라우팅으로 외부와, 프라이빗은 NAT로 나가기만→SG로 인스턴스 문단속+DB는 WAS-SG 참조 화이트리스트→접근은 키 대신 IAM Role."

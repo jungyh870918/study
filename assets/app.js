@@ -460,19 +460,114 @@
     }
   }
 
-  /* ---------- 문서 페이지 부트스트랩 ---------- */
+  /* ---------- 문서 페이지 부트스트랩 ----------
+     원문은 <script type="text/markdown" id="doc-source"> 안의 텍스트.
+     그 태그만 교체하면 페이지가 갱신된다(HTML 구조 불변). */
+  function getSource(data) {
+    if (data.sourceId) {
+      var el = document.getElementById(data.sourceId);
+      if (el) {
+        // 앞뒤 개행 1개씩만 정리(태그 줄바꿈), 나머지 원문 보존
+        return el.textContent.replace(/^\n/, "").replace(/\n$/, "");
+      }
+    }
+    return data.markdown || "";
+  }
+
   function bootReader() {
     var data = window.STUDY_DATA;
     if (!data) return;
     var target = document.getElementById("doc-body");
-    var result = data.isCheckQuestions
-      ? renderCheckQuestions(data.markdown)
-      : renderMarkdown(data.markdown);
-    target.innerHTML = result.html;
-    buildTOC(result.headings);
+    var md = getSource(data);
+
+    if (data.isCheckQuestions) {
+      // 확인질문은 아코디언 특수 렌더 유지(내장 렌더러 사용)
+      var r = renderCheckQuestions(md);
+      target.innerHTML = r.html;
+      buildTOC(r.headings);
+    } else if (window.marked) {
+      // 1순위: marked.js 로 본문 렌더 (표/코드/리스트 정확)
+      try {
+        window.marked.setOptions({ gfm: true, breaks: false, headerIds: false, mangle: false });
+      } catch (e) {}
+      var rawHtml = window.marked.parse(md);
+      target.innerHTML = rawHtml;
+      postProcess(target);                 // id 부여, 표 스크롤, 코드 복사, ★/→ 강조
+      buildTOC(collectHeadings(target));
+    } else {
+      // 오프라인 폴백: 내장 렌더러
+      var res = renderMarkdown(md);
+      target.innerHTML = res.html;
+      buildTOC(res.headings);
+      wireCopyButtons(target);
+    }
     wireCopyButtons(target);
     wireAccordion(target);
     applyHighlight();
+  }
+
+  /* marked.js 결과 후처리: 헤딩 id, 표 가로스크롤, 코드 복사버튼, 특수기호 강조 */
+  function postProcess(root) {
+    var used = {};
+    root.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach(function (h) {
+      if (!h.id) h.id = slugify(h.textContent, used);
+    });
+    // 표를 스크롤 컨테이너로 감싸기
+    root.querySelectorAll("table").forEach(function (t) {
+      if (t.parentElement && t.parentElement.classList.contains("table-scroll")) return;
+      var wrap = document.createElement("div");
+      wrap.className = "table-scroll";
+      t.parentNode.insertBefore(wrap, t);
+      wrap.appendChild(t);
+    });
+    // 코드블록에 복사 버튼
+    root.querySelectorAll("pre").forEach(function (pre) {
+      if (pre.parentElement && pre.parentElement.classList.contains("code-wrap")) return;
+      var wrap = document.createElement("div");
+      wrap.className = "code-wrap";
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+      var btn = document.createElement("button");
+      btn.className = "copy-btn"; btn.type = "button"; btn.textContent = "복사";
+      wrap.insertBefore(btn, pre);
+    });
+    // ★ / → 강조: 텍스트 노드만 순회(코드/태그 손상 방지)
+    decorateTextNodes(root);
+  }
+
+  function decorateTextNodes(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (n) {
+        var p = n.parentNode.nodeName;
+        if (p === "CODE" || p === "PRE" || p === "SCRIPT") return NodeFilter.FILTER_REJECT;
+        return /[★→]/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    var targets = [], n;
+    while ((n = walker.nextNode())) targets.push(n);
+    targets.forEach(function (node) {
+      var frag = document.createDocumentFragment();
+      var parts = node.nodeValue.split(/([★→])/);
+      parts.forEach(function (p) {
+        if (p === "★" || p === "→") {
+          var s = document.createElement("span");
+          s.className = p === "★" ? "marker" : "arrow";
+          s.textContent = p;
+          frag.appendChild(s);
+        } else if (p) {
+          frag.appendChild(document.createTextNode(p));
+        }
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+
+  function collectHeadings(root) {
+    var out = [];
+    root.querySelectorAll("h2,h3").forEach(function (h) {
+      out.push({ level: h.tagName === "H2" ? 2 : 3, text: h.textContent, id: h.id });
+    });
+    return out;
   }
 
   /* ---------- 공통 초기화 ---------- */

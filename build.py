@@ -272,7 +272,8 @@ window.DOCS = {docs_json};
 
 
 def build_doc(doc, prev_doc, next_doc, search_index_json):
-    md_js = json.dumps(doc["markdown"], ensure_ascii=False)
+    # 원문을 그대로 스크립트 태그에 넣는다. </script> 조기 종료만 방지.
+    md_raw = doc["markdown"].replace("</script", "<\\/script")
     prev_html = (f'<a href="{prev_doc["slug"]}">← {html.escape(prev_doc["short"])}</a>'
                  if prev_doc else '<span></span>')
     next_html = (f'<a href="{next_doc["slug"]}">{html.escape(next_doc["short"])} →</a>'
@@ -284,6 +285,14 @@ def build_doc(doc, prev_doc, next_doc, search_index_json):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(doc['short'])} · 학습 허브</title>
+<!-- ============================================================
+     이 페이지 갱신법:
+       (권장) md/ 파일 수정 후  python3 build.py  재실행.
+       (수동) 아래 <script type="text/markdown" id="doc-source"> 태그 안의
+              텍스트만 새 md 원문으로 교체 → 저장 → 새로고침.
+              HTML 구조/디자인/기능은 건드릴 필요 없음.
+              (검색 인덱스 최신화는 재빌드 필요)
+     ============================================================ -->
 <link rel="stylesheet" href="assets/style.css">
 <!-- 코드 강조: 인터넷 있으면 highlight.js 적용, 없으면 무시(핵심 동작 무관) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
@@ -309,14 +318,26 @@ def build_doc(doc, prev_doc, next_doc, search_index_json):
   </main>
 </div>
 
+<!-- ============================================================
+     ▼▼▼ 문서 원문(마크다운) ▼▼▼
+     여기 이 <script type="text/markdown"> 태그 "안의 텍스트만" 새 md로
+     교체하면 페이지가 갱신됩니다. HTML 구조는 건드릴 필요 없습니다.
+     (주의: 본문에 </script> 문자열이 있으면 <\\/script> 로 적어야 함 — 거의 없음)
+     ============================================================ -->
+<script type="text/markdown" id="doc-source">
+{md_raw}
+</script>
+
 <script>
-/* 원문 마크다운을 무손실로 심어 클라이언트에서 렌더링합니다. */
+/* 위 스크립트 태그의 원문을 그대로 읽어 렌더링합니다(무손실). */
 window.STUDY_DATA = {{
-  markdown: {md_js},
+  sourceId: "doc-source",
   isCheckQuestions: {str(doc['is_check']).lower()}
 }};
 window.SEARCH_INDEX = {search_index_json};
 </script>
+<!-- marked.js: 있으면 사용, 없으면(오프라인) 내장 렌더러로 폴백 -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>"""
