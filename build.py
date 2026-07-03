@@ -27,6 +27,7 @@ KIND_META = {
     "essentials":         {"label": "완전 기초",  "desc": "모르면 치명적인 필수 상식",                    "color": "#c2410c"},
     "checkquestions":     {"label": "확인 질문",  "desc": "자가 점검용 — 클릭해 펼치는 접이식 목록",        "color": "#b45309"},
     "practical":          {"label": "실전편",     "desc": "명령어·구현·경험 서술 포인트",                 "color": "#15803d"},
+    "tech_association":   {"label": "기술 연상 사전", "desc": "기술명 → 즉시 따라나올 실무 키워드 묶음",     "color": "#9333ea"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -53,7 +54,8 @@ def parse_filename(fn):
     num = int(m.group(1))
     rest = m.group(2)
     # 공통 문서: 0_answering_technique (주제 없음)
-    if rest in KIND_META and TOPIC_LABEL.get(rest) is None and "_" not in rest:
+    # rest 전체가 분류명이면 공통 문서(주제 없음). 예: answering_technique, tech_association
+    if rest in KIND_META and TOPIC_LABEL.get(rest) is None:
         return (num, None, rest)
     parts = rest.split("_")
     # 마지막 토큰이 알려진 분류면 그걸 kind로, 앞을 topic으로
