@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>시스템 디자인 부가 설명 · 학습 허브</title>
+<title>CI/CD·쿠버네티스 실전편 · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_16_sysdesign_basic.html">← 시스템 디자인 기본</a>
-      <a href="doc_18_sysdesign_essentials.html">시스템 디자인 완전 기초 →</a>
+      <a href="doc_24_devops_checkquestions.html">← CI/CD·쿠버네티스 확인 질문</a>
+      <a href="doc_26_frontend_basic.html">인증·프론트엔드 기본 →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,73 +63,98 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서17] 시스템 디자인 부가 설명 — 난이도 있는 개념 보충
-> 문서16에서 한 번 더 파고들 가치가 있는 것들.
+# [문서25] CI/CD·쿠버네티스 실전편 — 구축·운영·트러블슈팅
 
 ---
 
-## ① CAP를 넘어 — PACELC
-- CAP: 분할(P) 시 C vs A.
-- PACELC: 분할(P) 시 A vs C, 아니면(Else) 지연(L) vs 일관성(C)까지 확장.
-- 즉 분할 없는 평상시에도 "빠르게(낮은 지연) vs 정확하게(강한 일관성)" 트레이드오프가 있다.
-- 예: DynamoDB=PA/EL(가용·저지연 우선), 전통 RDB=PC/EC(일관성 우선).
+## 1. 파이프라인 구축 순서 (실전)
+1) Terraform으로 VPC·EKS·ECR·IAM 프로비저닝(state는 S3+DynamoDB).
+2) EKS에 필수 애드온: ALB Ingress Controller, Cluster Autoscaler/Karpenter, metrics-server(HPA용), External Secrets.
+3) ArgoCD 설치, 매니페스트 레포 연결.
+4) 앱 레포에 GitHub Actions: 빌드→테스트→스캔→ECR push→매니페스트 태그 커밋.
+5) ArgoCD가 감지해 배포. 헬스체크·롤백 구성.
+경험: "앱 레포(코드)와 매니페스트 레포(배포 설정)를 분리해 관심사를 나눴고, CI가 이미지 태그만 매니페스트에 커밋하면 ArgoCD가 배포했다."
 
-## ② 최종 일관성의 실제 (충돌 해결)
-- 여러 노드에 동시 쓰기 → 충돌. 해결법:
-  - Last-Write-Wins(타임스탬프 최신 우선, 단순하나 유실 위험)
-  - 벡터 클록(인과관계 추적)
-  - CRDT(수학적으로 병합 가능한 자료구조, 협업 편집)
-- read-your-writes: 방금 쓴 걸 못 읽는 문제 → 쓴 직후엔 마스터로 라우팅.
+## 2. 두 레포 분리 패턴 (GitOps 정석)
+- 앱 레포: 소스 코드 + Dockerfile + CI(Jenkinsfile/workflow).
+- 매니페스트 레포: k8s YAML/Helm/Kustomize. ArgoCD가 감시.
+- 이유: 코드 변경과 배포 설정 변경의 관심사 분리. 배포 이력이 매니페스트 레포 커밋으로 남음.
 
-## ③ 일관된 해싱 심화
-- 가상 노드가 없으면 서버 3대일 때 부하가 33%씩 안 나뉘고 치우침 → 각 서버를 링에 100~200번 배치해 균등화.
-- 서버 추가 시 이동하는 키 = 전체/서버수 (예: 3→4대면 약 1/4만 이동).
+## 3. 자주 겪는 트러블슈팅
+- Pod가 안 뜸: kubectl describe pod로 이벤트 확인.
+  - ImagePullBackOff → 이미지 태그/ECR 권한 문제.
+  - CrashLoopBackOff → 앱이 시작 직후 죽음(로그 kubectl logs 확인). 설정·환경변수·의존 서비스.
+  - Pending → 노드 자원 부족(오토스케일 확인) or 스케줄 제약.
+- OOMKilled: 메모리 limit 초과 → limit 조정 or 앱 메모리 누수.
+- Service 접속 안 됨: selector 라벨 불일치, 포트 매핑, Ingress 설정.
+- 배포됐는데 트래픽 안 옴: readiness probe 실패로 트래픽 제외됨.
 
-## ④ 큐 vs 스트림
-- 메시지 큐(RabbitMQ): 작업 분배, 소비되면 사라짐.
-- 이벤트 스트림(Kafka): 로그 보존, 여러 컨슈머가 각자 오프셋으로 재생 가능. 이벤트 소싱·재처리에 유리.
-- 선택: 단순 작업 분배=큐, 이벤트 기록·재생·여러 소비자=스트림.
+## 4. probe (헬스체크 3종)
+- liveness: 죽었나? 실패 시 Pod 재시작.
+- readiness: 트래픽 받을 준비됐나? 실패 시 Service에서 제외(재시작 X).
+- startup: 느린 시작 앱용, 시작 완료까지 다른 probe 유예.
+★ readiness 잘못 설정하면 "배포됐는데 트래픽 안 옴". liveness 너무 민감하면 재시작 루프.
 
-## ⑤ 캐싱 전략 4종
-- Cache-aside(lazy): 앱이 캐시 확인→없으면 DB→캐시 채움. 가장 흔함.
-- Write-through: 쓸 때 캐시+DB 동시. 읽기 빠름, 쓰기 느림.
-- Write-back: 캐시에만 쓰고 나중에 DB. 빠르지만 유실 위험.
-- Write-around: DB에만 쓰고 캐시는 읽을 때. 쓰고 안 읽는 데이터.
+## 5. 리소스 관리
+- requests: 스케줄링 기준(이만큼 보장). limits: 상한(넘으면 throttle/OOMKill).
+- request 없으면 스케줄러가 자원 판단 못 함. limit 없으면 한 Pod가 노드 자원 독점.
+- HPA는 request 대비 사용률로 스케일.
 
-## ⑥ 데이터베이스 종류별 용도
-- RDB(PostgreSQL/MySQL): 정합성·관계·트랜잭션.
-- 문서(MongoDB): 유연 스키마, 중첩 데이터.
-- 키-값(Redis/DynamoDB): 초고속 조회, 캐시·세션.
-- 컬럼(Cassandra): 대용량 쓰기, 시계열.
-- 그래프(Neo4j): 관계 탐색(친구의 친구).
-- 검색(Elasticsearch): 전문 검색, 역색인.
-- 시계열(InfluxDB): 메트릭·로그.
+## 6. 비용·운영 최적화
+- Karpenter: 필요한 만큼만 노드 프로비저닝(빠르고 저렴).
+- Spot 인스턴스: 무상태 워크로드에 비용 절감.
+- 이미지 작게(멀티스테이지)→pull 빠름·비용↓.
+- 네임스페이스별 리소스 쿼터로 폭주 방지.
 
-## ⑦ 낙관적 UI & 비동기 패턴
-- 낙관적 업데이트: 서버 응답 전에 UI 먼저 반영(좋아요 즉시 표시)→실패 시 롤백. 체감 속도↑.
-- 폴링 vs 롱폴링 vs WebSocket vs SSE: 실시간성 요구에 따라(채팅=WebSocket, 알림=SSE).
+## 7. 롤백 실전
+- GitOps: 매니페스트 레포에서 이전 커밋으로 revert→ArgoCD가 자동 동기화.
+- K8s 직접: kubectl rollout undo deployment/앱.
+- Argo Rollouts: 카나리 중 메트릭 나쁘면 자동 롤백.
+경험: "배포 후 에러율 급증 알람 → 매니페스트 레포 revert 한 번으로 이전 버전 복구, 5분 내 정상화."
 
-## ⑧ 관측성(Observability) 3축
-- 로그(무슨 일이): 구조화 로깅+요청 ID.
-- 메트릭(얼마나): QPS, 지연 p50/p99, 에러율.
-- 트레이싱(어디서): 분산 추적(요청이 서비스들을 어떻게 통과).
-- ★ p99가 평균보다 중요: 평균은 좋아도 상위 1% 사용자가 느리면 문제.
+## 8. 면접 경험 서술
+- "Terraform 모듈로 멀티 환경(dev/staging/prod) EKS를 코드로 관리했다."
+- "GitHub Actions에서 OIDC로 키 없이 ECR에 push하고, Trivy 스캔을 게이트로 걸었다."
+- "ArgoCD로 GitOps를 구성해 배포 이력을 Git에 남기고 커밋 revert로 롤백했다."
+- "HPA로 Pod, Karpenter로 노드를 오토스케일해 트래픽 급증에 대응했다."
+- "readiness probe 오설정으로 트래픽이 안 붙던 걸 진단해 고쳤다."
 
-## ⑨ 이벤트 드리븐 & 메시지 큐 영속성 (NATS/Kafka)
-"서비스가 꺼졌다 켜지면 이벤트가 자동으로 채워짐"의 원리:
-- durable subscription(영속 구독)+offset 추적: 각 컨슈머가 "어디까지 처리했나"를 offset(시퀀스 번호)으로 기록.
-- 브로커가 메시지 영속화(persistence)→서비스 죽어도 유실 안 됨.
-- 재시작 시 "마지막 offset 다음부터" 다시 받음→꺼진 동안 쌓인 이벤트 순서대로 전달=자동으로 채워짐.
-- = at-least-once 전달 보장의 실체. 이벤트 소싱/이벤트 드리븐 아키텍처.
-- 각 MSA가 이벤트를 자기 DB에 저장+다른 서비스도 같은 이벤트 받아 갱신→최종 일관성(eventual).
+---
 
-## ⑩ 이벤트 순서 보장 & 넘버링
-- 각 이벤트에 단조 증가 시퀀스 번호(NATS=sequence, Kafka=offset). WAL/LSN과 같은 원리.
-- 컨슈머는 번호 순서대로 처리+"여기까지 처리" commit.
-- 순서 범위: 파티션/스트림 내에서는 순서 보장, 여러 파티션 걸치면 전역 순서 미보장→순서 중요하면 같은 키를 같은 파티션(같은 주문 ID→같은 파티션).
-★ 순서 vs 확장 트레이드오프: 전역 순서 원하면 파티션 1개(병렬 불가, 느림), 확장하려면 여러 개(파티션 내 순서만). 실무: 순서 중요한 단위(주문/사용자 ID)를 파티션 키로→"단위 내 순서+단위 간 병렬".
-- 멱등성 결합: at-least-once라 중복 전달 가능→컨슈머가 이벤트 번호로 "이미 처리?" 확인해 중복 무시. 순서 보장+멱등성이 이벤트 처리 안정성 핵심.
-경험 서술: "NATS Streaming으로 이벤트 드리븐 구성. durable subscription으로 offset 추적해 서비스 재시작 시 놓친 이벤트 순서대로 재생받아 자동 복구. 시퀀스 번호로 순서 보장, at-least-once라 멱등성으로 중복 처리."
+## 9. Helm (쿠버네티스 패키지 매니저)
+정의: 앱 배포에 필요한 여러 YAML(Deployment/Service/ConfigMap)을 하나의 패키지(차트)로 묶어 관리. "K8s의 apt/npm".
+인과: 앱 하나에 YAML 10개+환경별 값 차이→복붙 지옥. Helm은 템플릿+values로 해결(템플릿 하나+환경별 values.yaml 주입).
+차트 구조: Chart.yaml(메타)/values.yaml(기본값)/templates/(YAML 템플릿, {{ .Values.image }}).
+명령: helm install/upgrade/rollback. helm install myapp bitnami/redis(공개 차트 한 줄).
+★ 가치: Redis/PG/모니터링을 검증된 공개 차트로 한 줄 설치+우리 앱도 차트로 환경별 배포·롤백. (Kustomize와 대안: 복잡 파라미터화=Helm, 단순 환경차이=Kustomize)
+
+## 10. Docker & kubectl 필수 명령어
+Docker:
+- docker build -t app:v1 . / run -p 8080:80 app:v1 / ps / logs <id> / exec -it <id> sh / push / images / stop·rm
+kubectl:
+- get pods(-A 전체) / describe pod(이벤트, 트러블슈팅 1순위) / logs(-f 실시간, --previous 이전 컨테이너)
+- exec -it <pod> -- sh / apply -f / delete -f
+- rollout status·undo deploy/app / scale --replicas=5 / get svc·ingress / top pods(리소스)
+★ 트러블슈팅 3종: get(뭐가 있나)→describe(왜 이상, 이벤트)→logs(앱이 뭐라). Pod 안 뜨면 이 순서.
+
+## 11. 쿠버네티스 스토리지
+핵심 문제: Pod는 일시적(ephemeral)→죽으면 데이터 소실. DB·파일은 영속 필요→이 간극을 메움.
+계층:
+- Volume: Pod에 붙는 공간. emptyDir(임시)/hostPath(노드 디스크).
+- PV(PersistentVolume): 클러스터 레벨 실제 저장소(EBS/EFS/NFS).
+- PVC(PersistentVolumeClaim): Pod가 "이만큼 주세요" 요청. PV와 바인딩.
+- StorageClass: PV를 동적 자동 생성 템플릿(EBS gp3). PVC 오면 자동 생성.
+흐름: Pod→PVC(요청)→PV(실제)←StorageClass(자동 생성).
+★ StatefulSet: 일반 Deployment는 Pod 이름·저장소 뒤죽박죽→DB 부적합. StatefulSet은 안정적 이름(app-0,1)+각자 영속 볼륨. DB/Kafka/Redis 클러스터처럼 정체성·데이터 유지 필요한 앱.
+★ 실무: StatefulSet+PVC로 DB 올릴 수 있지만 관리형(RDS)이 대개 나음(백업·복제·복구를 AWS에). K8s는 무상태 앱만. "넣을 수 있지만 넣어야 하나?"의 판단. EBS(블록,한 노드) vs EFS(파일,여러 노드 공유).
+
+## 12. 헬스체크 주기 설정 (probe 튜닝)
+livenessProbe: initialDelaySeconds(첫 체크까지 대기, 앱 부팅시간)/periodSeconds(주기)/timeoutSeconds/failureThreshold(몇 번 실패하면 조치).
+★ 튜닝:
+- initialDelay 너무 짧으면 부팅 중 앱을 죽었다 오판→재시작 루프. 시작시간보다 넉넉히.
+- period 짧으면 빠른 감지+부하↑. liveness 여유롭게, readiness 촘촘히(트래픽 결정).
+- failureThreshold 민감하면 일시 지연에도 재시작, 둔하면 늦게 감지.
+- ★ liveness 너무 민감=정상인데 계속 재시작 재앙. readiness=트래픽 받을지, liveness=재시작할지.
 
 </script>
 

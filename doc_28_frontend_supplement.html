@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>시스템 디자인 부가 설명 · 학습 허브</title>
+<title>인증·프론트엔드 부가 설명 · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_16_sysdesign_basic.html">← 시스템 디자인 기본</a>
-      <a href="doc_18_sysdesign_essentials.html">시스템 디자인 완전 기초 →</a>
+      <a href="doc_27_frontend_checkquestions.html">← 인증·프론트엔드 확인 질문</a>
+      <a href="doc_29_domain_practical.html">도메인 설계 사례 →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,73 +63,79 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서17] 시스템 디자인 부가 설명 — 난이도 있는 개념 보충
-> 문서16에서 한 번 더 파고들 가치가 있는 것들.
+# [문서28] 인증·프론트엔드 부가 설명 — 난이도 있는 개념 보충
 
 ---
 
-## ① CAP를 넘어 — PACELC
-- CAP: 분할(P) 시 C vs A.
-- PACELC: 분할(P) 시 A vs C, 아니면(Else) 지연(L) vs 일관성(C)까지 확장.
-- 즉 분할 없는 평상시에도 "빠르게(낮은 지연) vs 정확하게(강한 일관성)" 트레이드오프가 있다.
-- 예: DynamoDB=PA/EL(가용·저지연 우선), 전통 RDB=PC/EC(일관성 우선).
+## ① HttpOnly 쿠키 & CSRF (자세히)
+HttpOnly: 쿠키에 HttpOnly 플래그→JS가 못 읽음(document.cookie 불가). 브라우저가 서버 요청 시만 자동 전송. XSS로 악성 JS 주입돼도 탈취 불가.
+왜 CSRF 취약: 쿠키 "자동 전송"이 양날. 브라우저는 해당 도메인 모든 요청에 쿠키 자동 첨부(요청 출처 안 따짐).
+CSRF 시나리오:
+1) bank.com 로그인(HttpOnly 쿠키에 토큰)
+2) 로그아웃 안 하고 evil.com 방문
+3) evil.com에 숨은 <form action=bank.com/transfer POST> 또는 <img src=...>
+4) 브라우저가 bank.com 요청에 인증 쿠키 자동 첨부!
+5) 서버는 정상 요청으로 착각→이체
+핵심: 공격자가 토큰 훔치는 게 아니라 "브라우저가 쿠키를 붙여주는 걸 악용". HttpOnly로 못 막음(읽는 게 아니니).
+방어1 SameSite:
+- Strict: 다른 사이트 요청엔 쿠키 안 붙임. 가장 안전, 외부 링크 진입 시 로그인 풀림(UX).
+- Lax: 안전한 이동(링크/GET)엔 붙임, POST/이미지/iframe 위조엔 안 붙임. 실무 기본.
+- None: 항상 붙임(크로스 사이트), Secure 필수.
+방어2 CSRF 토큰:
+1) 서버가 예측 불가 랜덤 토큰 발급
+2) 클라가 요청 시 헤더/body에 담아 전송
+3) 서버가 "세션+CSRF 토큰" 짝 검증
+evil.com은 이 랜덤 토큰 모름(같은 출처 아니라 못 읽음)→위조 불가. 상태 변경(POST/PUT/DELETE)에 적용.
+정리: SameSite=Lax 기본+중요 변경엔 CSRF 토큰. HttpOnly(XSS)+SameSite+CSRF 토큰(CSRF)=삼중 방어.
 
-## ② 최종 일관성의 실제 (충돌 해결)
-- 여러 노드에 동시 쓰기 → 충돌. 해결법:
-  - Last-Write-Wins(타임스탬프 최신 우선, 단순하나 유실 위험)
-  - 벡터 클록(인과관계 추적)
-  - CRDT(수학적으로 병합 가능한 자료구조, 협업 편집)
-- read-your-writes: 방금 쓴 걸 못 읽는 문제 → 쓴 직후엔 마스터로 라우팅.
+## ② 액세스 토큰 vs 리프레시 토큰 (존재 이유=자동 로그인)
+딜레마: 수명 짧으면 안전하나 자주 로그인(불편), 길면 편하나 탈취 시 오래 악용(위험).
+해결(두 토큰):
+- 액세스: 짧음(15분~1h), 매 요청 첨부, 메모리 저장, 노출 큼.
+- 리프레시: 김(수일~수주), 액세스 갱신용, HttpOnly 쿠키, 노출 적음.
+흐름(자동 로그인 실체):
+1) 로그인→액세스(15분)+리프레시(2주) 발급
+2) API마다 액세스 첨부
+3) 15분 후 만료→401
+4) 클라가 리프레시로 "새 액세스 주세요"
+5) 서버 검증→새 액세스 발급
+6) 사용자는 모름→끊김 없이 사용(=자동 로그인)
+인과: 액세스 탈취돼도 15분이면 만료(피해 최소)+리프레시는 HttpOnly라 탈취 어렵고 갱신 때만 노출. "2주 유지"(편의)+"탈취 피해 최소"(보안) 동시 달성.
+★ 리프레시 회전(rotation): 갱신마다 리프레시도 새로 발급+기존 폐기. 탈취된 것 재사용 시 감지해 세션 차단.
 
-## ③ 일관된 해싱 심화
-- 가상 노드가 없으면 서버 3대일 때 부하가 33%씩 안 나뉘고 치우침 → 각 서버를 링에 100~200번 배치해 균등화.
-- 서버 추가 시 이동하는 키 = 전체/서버수 (예: 3→4대면 약 1/4만 이동).
+## ③ React Query "서버 상태"의 서버 = 백엔드 API (헷갈림 해소)
+- 서버 상태: 원본이 백엔드(API/DB)에 있는 데이터. 프론트는 fetch해 사본(캐시)만 들고 있음.
+- 클라이언트 상태: 프론트에만 존재(모달/폼 값/다크모드).
+- ★ React Query의 "서버" = 당신의 백엔드 API 서버(NestJS/Express). Next 서버 컴포넌트나 리액트 서버가 아님.
+Next와 관계:
+- Next 서버 컴포넌트: Next 서버에서 렌더링 시 데이터 미리 fetch(위치=렌더링).
+- React Query: 브라우저에서 백엔드 API fetch·캐싱(개념=데이터 원본).
+- 다른 층. 초기 데이터는 서버 컴포넌트, 이후 인터랙션은 React Query로 함께 씀.
 
-## ④ 큐 vs 스트림
-- 메시지 큐(RabbitMQ): 작업 분배, 소비되면 사라짐.
-- 이벤트 스트림(Kafka): 로그 보존, 여러 컨슈머가 각자 오프셋으로 재생 가능. 이벤트 소싱·재처리에 유리.
-- 선택: 단순 작업 분배=큐, 이벤트 기록·재생·여러 소비자=스트림.
+## ④ DTO & ValidationPipe (NestJS)
+DTO: 계층 간 데이터 형태 정의 객체. "이 요청/응답은 이런 필드"의 계약.
+  class CreateUserDto { @IsEmail() email; @IsString() @MinLength(8) password; @IsOptional() @IsInt() age?; }
+왜: 명확한 계약(타입 명시)+유효성 기준(데코레이터)+엔티티와 분리(내부 필드 숨김).
+ValidationPipe: 컨트롤러 도달 전 입력 변환·검증. DTO 규칙과 대조.
+  app.useGlobalPipes(new ValidationPipe({ whitelist:true(없는 필드 제거), forbidNonWhitelisted:true(없는 필드 에러), transform:true(타입 변환) }))
+- 위반이면 자동 400(컨트롤러 도달 전)→컨트롤러는 검증된 데이터만 받음. 검증 로직을 컨트롤러에서 분리.
 
-## ⑤ 캐싱 전략 4종
-- Cache-aside(lazy): 앱이 캐시 확인→없으면 DB→캐시 채움. 가장 흔함.
-- Write-through: 쓸 때 캐시+DB 동시. 읽기 빠름, 쓰기 느림.
-- Write-back: 캐시에만 쓰고 나중에 DB. 빠르지만 유실 위험.
-- Write-around: DB에만 쓰고 캐시는 읽을 때. 쓰고 안 읽는 데이터.
-
-## ⑥ 데이터베이스 종류별 용도
-- RDB(PostgreSQL/MySQL): 정합성·관계·트랜잭션.
-- 문서(MongoDB): 유연 스키마, 중첩 데이터.
-- 키-값(Redis/DynamoDB): 초고속 조회, 캐시·세션.
-- 컬럼(Cassandra): 대용량 쓰기, 시계열.
-- 그래프(Neo4j): 관계 탐색(친구의 친구).
-- 검색(Elasticsearch): 전문 검색, 역색인.
-- 시계열(InfluxDB): 메트릭·로그.
-
-## ⑦ 낙관적 UI & 비동기 패턴
-- 낙관적 업데이트: 서버 응답 전에 UI 먼저 반영(좋아요 즉시 표시)→실패 시 롤백. 체감 속도↑.
-- 폴링 vs 롱폴링 vs WebSocket vs SSE: 실시간성 요구에 따라(채팅=WebSocket, 알림=SSE).
-
-## ⑧ 관측성(Observability) 3축
-- 로그(무슨 일이): 구조화 로깅+요청 ID.
-- 메트릭(얼마나): QPS, 지연 p50/p99, 에러율.
-- 트레이싱(어디서): 분산 추적(요청이 서비스들을 어떻게 통과).
-- ★ p99가 평균보다 중요: 평균은 좋아도 상위 1% 사용자가 느리면 문제.
-
-## ⑨ 이벤트 드리븐 & 메시지 큐 영속성 (NATS/Kafka)
-"서비스가 꺼졌다 켜지면 이벤트가 자동으로 채워짐"의 원리:
-- durable subscription(영속 구독)+offset 추적: 각 컨슈머가 "어디까지 처리했나"를 offset(시퀀스 번호)으로 기록.
-- 브로커가 메시지 영속화(persistence)→서비스 죽어도 유실 안 됨.
-- 재시작 시 "마지막 offset 다음부터" 다시 받음→꺼진 동안 쌓인 이벤트 순서대로 전달=자동으로 채워짐.
-- = at-least-once 전달 보장의 실체. 이벤트 소싱/이벤트 드리븐 아키텍처.
-- 각 MSA가 이벤트를 자기 DB에 저장+다른 서비스도 같은 이벤트 받아 갱신→최종 일관성(eventual).
-
-## ⑩ 이벤트 순서 보장 & 넘버링
-- 각 이벤트에 단조 증가 시퀀스 번호(NATS=sequence, Kafka=offset). WAL/LSN과 같은 원리.
-- 컨슈머는 번호 순서대로 처리+"여기까지 처리" commit.
-- 순서 범위: 파티션/스트림 내에서는 순서 보장, 여러 파티션 걸치면 전역 순서 미보장→순서 중요하면 같은 키를 같은 파티션(같은 주문 ID→같은 파티션).
-★ 순서 vs 확장 트레이드오프: 전역 순서 원하면 파티션 1개(병렬 불가, 느림), 확장하려면 여러 개(파티션 내 순서만). 실무: 순서 중요한 단위(주문/사용자 ID)를 파티션 키로→"단위 내 순서+단위 간 병렬".
-- 멱등성 결합: at-least-once라 중복 전달 가능→컨슈머가 이벤트 번호로 "이미 처리?" 확인해 중복 무시. 순서 보장+멱등성이 이벤트 처리 안정성 핵심.
-경험 서술: "NATS Streaming으로 이벤트 드리븐 구성. durable subscription으로 offset 추적해 서비스 재시작 시 놓친 이벤트 순서대로 재생받아 자동 복구. 시퀀스 번호로 순서 보장, at-least-once라 멱등성으로 중복 처리."
+## ⑤ NestJS 요청 한 바퀴 (전체 흐름) ★
+[클라 요청]
+① Middleware: 가장 먼저. 로깅/CORS/body 파싱/토큰 추출. Express 레벨.
+② Guards: 인증·인가("접근 권한 있나?"). JWT 검증/역할. 실패 403/401.
+③ Interceptors(before): 요청 가로채 부가 처리(로깅/타이머 시작).
+④ Pipes: 입력 변환·검증(ValidationPipe가 DTO로). 위반이면 400.
+⑤ Controller: 라우트 핸들러, Service 호출.
+⑥ Service: 비즈니스 로직(DI 주입).
+⑦ Repository: DB 접근(TypeORM/Prisma), 쿼리 실행.
+[DB] 읽기/쓰기
+→ 역방향 ⑦→⑥→⑤ 반환
+③ Interceptors(after): 응답 가로채 변형(포맷 통일/로깅 완료/시간 측정).
+② Exception Filters: 에러 잡아 응답 포맷팅.
+[클라 응답]
+★ 인터셉터 vs 미들웨어: 미들웨어=컨트롤러 전에만, Express 레벨. 인터셉터=요청 전+응답 후 양쪽, Nest 레벨(응답 변형 가능, 포맷 통일 {data:...}이 대표 용도).
+한문장: "미들웨어(전처리)→가드(인증/인가)→인터셉터(전처리)→파이프(DTO 검증)→컨트롤러→서비스(로직)→레포지토리(DB), 응답은 인터셉터(후처리)로, 에러는 예외 필터가 잡음."
 
 </script>
 

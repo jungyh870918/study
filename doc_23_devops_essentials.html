@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>시스템 디자인 부가 설명 · 학습 허브</title>
+<title>CI/CD·쿠버네티스 완전 기초 · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_16_sysdesign_basic.html">← 시스템 디자인 기본</a>
-      <a href="doc_18_sysdesign_essentials.html">시스템 디자인 완전 기초 →</a>
+      <a href="doc_22_devops_supplement.html">← CI/CD·쿠버네티스 부가 설명</a>
+      <a href="doc_24_devops_checkquestions.html">CI/CD·쿠버네티스 확인 질문 →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,73 +63,52 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서17] 시스템 디자인 부가 설명 — 난이도 있는 개념 보충
-> 문서16에서 한 번 더 파고들 가치가 있는 것들.
+# [문서23] CI/CD·쿠버네티스 완전 기초 — 모르면 안 되는 상식
 
 ---
 
-## ① CAP를 넘어 — PACELC
-- CAP: 분할(P) 시 C vs A.
-- PACELC: 분할(P) 시 A vs C, 아니면(Else) 지연(L) vs 일관성(C)까지 확장.
-- 즉 분할 없는 평상시에도 "빠르게(낮은 지연) vs 정확하게(강한 일관성)" 트레이드오프가 있다.
-- 예: DynamoDB=PA/EL(가용·저지연 우선), 전통 RDB=PC/EC(일관성 우선).
+## 컨테이너 vs VM
+- VM: 하드웨어 가상화, 게스트 OS 포함(무겁다).
+- 컨테이너: OS 커널 공유, 프로세스 격리(가볍다, 빠른 시작).
+- Docker는 컨테이너, 이미지는 그 실행 템플릿.
 
-## ② 최종 일관성의 실제 (충돌 해결)
-- 여러 노드에 동시 쓰기 → 충돌. 해결법:
-  - Last-Write-Wins(타임스탬프 최신 우선, 단순하나 유실 위험)
-  - 벡터 클록(인과관계 추적)
-  - CRDT(수학적으로 병합 가능한 자료구조, 협업 편집)
-- read-your-writes: 방금 쓴 걸 못 읽는 문제 → 쓴 직후엔 마스터로 라우팅.
+## Docker 기본
+- Dockerfile: 이미지 빌드 레시피.
+- 이미지: 불변 패키지(앱+환경). 컨테이너: 이미지의 실행 인스턴스.
+- FROM(베이스)/RUN(명령)/COPY(파일)/CMD(실행)/EXPOSE(포트).
+- docker build/run/push/pull.
 
-## ③ 일관된 해싱 심화
-- 가상 노드가 없으면 서버 3대일 때 부하가 33%씩 안 나뉘고 치우침 → 각 서버를 링에 100~200번 배치해 균등화.
-- 서버 추가 시 이동하는 키 = 전체/서버수 (예: 3→4대면 약 1/4만 이동).
+## K8s 기본 명령
+- kubectl get/describe/logs/exec/apply/delete.
+- kubectl apply -f manifest.yaml (선언적 적용).
+- kubectl rollout undo (롤백).
 
-## ④ 큐 vs 스트림
-- 메시지 큐(RabbitMQ): 작업 분배, 소비되면 사라짐.
-- 이벤트 스트림(Kafka): 로그 보존, 여러 컨슈머가 각자 오프셋으로 재생 가능. 이벤트 소싱·재처리에 유리.
-- 선택: 단순 작업 분배=큐, 이벤트 기록·재생·여러 소비자=스트림.
+## K8s 오브젝트 요약
+- Pod(최소 단위)/Deployment(Pod 관리)/Service(접근점)/Ingress(외부 라우팅)/ConfigMap·Secret(설정)/Namespace(격리).
+- ReplicaSet(Pod 복제)/StatefulSet(상태 있는 앱, DB)/DaemonSet(모든 노드에 하나씩).
 
-## ⑤ 캐싱 전략 4종
-- Cache-aside(lazy): 앱이 캐시 확인→없으면 DB→캐시 채움. 가장 흔함.
-- Write-through: 쓸 때 캐시+DB 동시. 읽기 빠름, 쓰기 느림.
-- Write-back: 캐시에만 쓰고 나중에 DB. 빠르지만 유실 위험.
-- Write-around: DB에만 쓰고 캐시는 읽을 때. 쓰고 안 읽는 데이터.
+## CI/CD 용어
+- 파이프라인/스테이지/잡/스텝/러너(실행 환경).
+- 아티팩트: 빌드 결과물(이미지·바이너리).
+- 트리거: 파이프라인 시작 이벤트(push/PR/스케줄).
 
-## ⑥ 데이터베이스 종류별 용도
-- RDB(PostgreSQL/MySQL): 정합성·관계·트랜잭션.
-- 문서(MongoDB): 유연 스키마, 중첩 데이터.
-- 키-값(Redis/DynamoDB): 초고속 조회, 캐시·세션.
-- 컬럼(Cassandra): 대용량 쓰기, 시계열.
-- 그래프(Neo4j): 관계 탐색(친구의 친구).
-- 검색(Elasticsearch): 전문 검색, 역색인.
-- 시계열(InfluxDB): 메트릭·로그.
+## IaC 개념
+- 인프라를 코드로. 선언형(Terraform: 원하는 상태)/명령형(스크립트: 단계).
+- 멱등성: 여러 번 apply해도 같은 결과.
+- 상태 관리, plan/apply.
 
-## ⑦ 낙관적 UI & 비동기 패턴
-- 낙관적 업데이트: 서버 응답 전에 UI 먼저 반영(좋아요 즉시 표시)→실패 시 롤백. 체감 속도↑.
-- 폴링 vs 롱폴링 vs WebSocket vs SSE: 실시간성 요구에 따라(채팅=WebSocket, 알림=SSE).
+## 환경 분리
+- dev/staging/prod. 설정은 환경변수·ConfigMap으로 분리.
+- 12-Factor App: 설정을 코드와 분리, 상태 외부화 등.
 
-## ⑧ 관측성(Observability) 3축
-- 로그(무슨 일이): 구조화 로깅+요청 ID.
-- 메트릭(얼마나): QPS, 지연 p50/p99, 에러율.
-- 트레이싱(어디서): 분산 추적(요청이 서비스들을 어떻게 통과).
-- ★ p99가 평균보다 중요: 평균은 좋아도 상위 1% 사용자가 느리면 문제.
+## AWS 컨테이너 서비스 비교
+- EKS: 관리형 쿠버네티스(표준 K8s).
+- ECS: AWS 고유 오케스트레이터(단순, AWS 종속).
+- Fargate: 서버리스 컨테이너(노드 관리 없음). EKS/ECS와 결합.
 
-## ⑨ 이벤트 드리븐 & 메시지 큐 영속성 (NATS/Kafka)
-"서비스가 꺼졌다 켜지면 이벤트가 자동으로 채워짐"의 원리:
-- durable subscription(영속 구독)+offset 추적: 각 컨슈머가 "어디까지 처리했나"를 offset(시퀀스 번호)으로 기록.
-- 브로커가 메시지 영속화(persistence)→서비스 죽어도 유실 안 됨.
-- 재시작 시 "마지막 offset 다음부터" 다시 받음→꺼진 동안 쌓인 이벤트 순서대로 전달=자동으로 채워짐.
-- = at-least-once 전달 보장의 실체. 이벤트 소싱/이벤트 드리븐 아키텍처.
-- 각 MSA가 이벤트를 자기 DB에 저장+다른 서비스도 같은 이벤트 받아 갱신→최종 일관성(eventual).
-
-## ⑩ 이벤트 순서 보장 & 넘버링
-- 각 이벤트에 단조 증가 시퀀스 번호(NATS=sequence, Kafka=offset). WAL/LSN과 같은 원리.
-- 컨슈머는 번호 순서대로 처리+"여기까지 처리" commit.
-- 순서 범위: 파티션/스트림 내에서는 순서 보장, 여러 파티션 걸치면 전역 순서 미보장→순서 중요하면 같은 키를 같은 파티션(같은 주문 ID→같은 파티션).
-★ 순서 vs 확장 트레이드오프: 전역 순서 원하면 파티션 1개(병렬 불가, 느림), 확장하려면 여러 개(파티션 내 순서만). 실무: 순서 중요한 단위(주문/사용자 ID)를 파티션 키로→"단위 내 순서+단위 간 병렬".
-- 멱등성 결합: at-least-once라 중복 전달 가능→컨슈머가 이벤트 번호로 "이미 처리?" 확인해 중복 무시. 순서 보장+멱등성이 이벤트 처리 안정성 핵심.
-경험 서술: "NATS Streaming으로 이벤트 드리븐 구성. durable subscription으로 offset 추적해 서비스 재시작 시 놓친 이벤트 순서대로 재생받아 자동 복구. 시퀀스 번호로 순서 보장, at-least-once라 멱등성으로 중복 처리."
+## 롤백 개념
+- 배포 실패 시 이전 버전으로. K8s는 rollout undo, GitOps는 커밋 revert.
+- 이미지 태그를 버전으로 관리해야 롤백 가능(latest 금지 이유).
 
 </script>
 

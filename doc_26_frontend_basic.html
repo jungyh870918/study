@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>시스템 디자인 부가 설명 · 학습 허브</title>
+<title>인증·프론트엔드 기본 · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_16_sysdesign_basic.html">← 시스템 디자인 기본</a>
-      <a href="doc_18_sysdesign_essentials.html">시스템 디자인 완전 기초 →</a>
+      <a href="doc_25_devops_practical.html">← CI/CD·쿠버네티스 실전편</a>
+      <a href="doc_27_frontend_checkquestions.html">인증·프론트엔드 확인 질문 →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,73 +63,73 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서17] 시스템 디자인 부가 설명 — 난이도 있는 개념 보충
-> 문서16에서 한 번 더 파고들 가치가 있는 것들.
+# [문서26] 인증·프론트엔드 기본 — 면접 실전용
+> 인증 저장소(JWT/쿠키/localStorage) + 상태관리(React Query/Redux/Hooks) + NestJS DI.
 
 ---
 
-## ① CAP를 넘어 — PACELC
-- CAP: 분할(P) 시 C vs A.
-- PACELC: 분할(P) 시 A vs C, 아니면(Else) 지연(L) vs 일관성(C)까지 확장.
-- 즉 분할 없는 평상시에도 "빠르게(낮은 지연) vs 정확하게(강한 일관성)" 트레이드오프가 있다.
-- 예: DynamoDB=PA/EL(가용·저지연 우선), 전통 RDB=PC/EC(일관성 우선).
+## 1. JWT / 쿠키 / localStorage (세션 관리)
+개념 구분: JWT=토큰의 "형식"(무엇 저장), 쿠키/localStorage/메모리=저장 "위치"(어디에). 다른 축. "JWT vs 쿠키"는 잘못된 대비(JWT를 쿠키에도 localStorage에도 담을 수 있음).
 
-## ② 최종 일관성의 실제 (충돌 해결)
-- 여러 노드에 동시 쓰기 → 충돌. 해결법:
-  - Last-Write-Wins(타임스탬프 최신 우선, 단순하나 유실 위험)
-  - 벡터 클록(인과관계 추적)
-  - CRDT(수학적으로 병합 가능한 자료구조, 협업 편집)
-- read-your-writes: 방금 쓴 걸 못 읽는 문제 → 쓴 직후엔 마스터로 라우팅.
+JWT 본질(세션 vs 토큰):
+- 전통 세션: 서버가 상태 보관(stateful), 클라는 세션 ID만. 확장 시 세션 공유 필요.
+- JWT: 서버 서명만 검증, 상태 안 가짐(stateless) → 수평 확장 쉬움. 단 즉시 무효화 어려움(만료까지 유효)→블랙리스트/짧은 만료로 보완.
 
-## ③ 일관된 해싱 심화
-- 가상 노드가 없으면 서버 3대일 때 부하가 33%씩 안 나뉘고 치우침 → 각 서버를 링에 100~200번 배치해 균등화.
-- 서버 추가 시 이동하는 키 = 전체/서버수 (예: 3→4대면 약 1/4만 이동).
+저장 위치별 장단점:
+- localStorage: 간단·JS 접근 쉬움·5MB·CSRF 면역 / ★ XSS 취약(JS 탈취)·수동 헤더 주입·만료 수동.
+- 쿠키(HttpOnly): ★ XSS 방어(JS 접근 불가)·자동 전송·SSR 친화 / CSRF 취약(대응 필요)·4KB·매 요청 오버헤드.
+- 메모리(JS 변수): 가장 안전(새로고침 시 소멸) / 새로고침하면 사라짐→리프레시 토큰 필요.
 
-## ④ 큐 vs 스트림
-- 메시지 큐(RabbitMQ): 작업 분배, 소비되면 사라짐.
-- 이벤트 스트림(Kafka): 로그 보존, 여러 컨슈머가 각자 오프셋으로 재생 가능. 이벤트 소싱·재처리에 유리.
-- 선택: 단순 작업 분배=큐, 이벤트 기록·재생·여러 소비자=스트림.
+두 공격:
+- XSS: 악성 JS 주입→localStorage 탈취. HttpOnly 쿠키는 JS 접근 불가라 방어.
+- CSRF: 요청 위조. 쿠키 자동 전송돼 취약→SameSite=Strict/Lax+CSRF 토큰 방어.
 
-## ⑤ 캐싱 전략 4종
-- Cache-aside(lazy): 앱이 캐시 확인→없으면 DB→캐시 채움. 가장 흔함.
-- Write-through: 쓸 때 캐시+DB 동시. 읽기 빠름, 쓰기 느림.
-- Write-back: 캐시에만 쓰고 나중에 DB. 빠르지만 유실 위험.
-- Write-around: DB에만 쓰고 캐시는 읽을 때. 쓰고 안 읽는 데이터.
+★ 실무 정답(하이브리드):
+- 액세스 토큰(짧은 수명 15분) → 메모리(React state)
+- 리프레시 토큰(긴 수명) → HttpOnly+Secure+SameSite 쿠키
+- 두 공격 동시 최소화. XSS로도 지속 탈취 어렵고, 리프레시는 JS가 못 읽음.
 
-## ⑥ 데이터베이스 종류별 용도
-- RDB(PostgreSQL/MySQL): 정합성·관계·트랜잭션.
-- 문서(MongoDB): 유연 스키마, 중첩 데이터.
-- 키-값(Redis/DynamoDB): 초고속 조회, 캐시·세션.
-- 컬럼(Cassandra): 대용량 쓰기, 시계열.
-- 그래프(Neo4j): 관계 탐색(친구의 친구).
-- 검색(Elasticsearch): 전문 검색, 역색인.
-- 시계열(InfluxDB): 메트릭·로그.
+상황별:
+- REST+모바일/서드파티: localStorage/헤더(쿠키 못 쓰는 환경), CSP로 XSS 방어.
+- 웹+SSR(Next): HttpOnly 쿠키(서버가 읽어 인증, Next 궁합).
+- 보안 최우선(금융): 하이브리드+짧은 만료+리프레시 회전.
+- ★ 원칙: "편하면 localStorage, 민감하면 HttpOnly 쿠키, 최고 보안은 하이브리드. XSS 막는 게 근본(뚫리면 어디 저장하든 위험)."
 
-## ⑦ 낙관적 UI & 비동기 패턴
-- 낙관적 업데이트: 서버 응답 전에 UI 먼저 반영(좋아요 즉시 표시)→실패 시 롤백. 체감 속도↑.
-- 폴링 vs 롱폴링 vs WebSocket vs SSE: 실시간성 요구에 따라(채팅=WebSocket, 알림=SSE).
+## 2. React Hooks
+- useState: 로컬 상태. useEffect: 사이드이펙트(fetch/구독/타이머), 의존성 배열+클린업.
+- useContext: 전역값(prop drilling 회피), 저빈도 변경(테마/인증).
+- useMemo/useCallback: 비싼 계산·함수 재생성 방지(리렌더 최적화), 남용 금지.
+- useRef: 리렌더 없이 값 유지·DOM 접근. 커스텀 훅: 로직 재사용.
+★ Next(서버 컴포넌트 시대): App Router는 서버 컴포넌트 기본. 훅은 클라이언트 컴포넌트에서만('use client' 명시). 데이터 페칭=서버 컴포넌트(async), 인터랙션·브라우저 API=클라이언트 훅. 이 경계 나누기가 핵심.
 
-## ⑧ 관측성(Observability) 3축
-- 로그(무슨 일이): 구조화 로깅+요청 ID.
-- 메트릭(얼마나): QPS, 지연 p50/p99, 에러율.
-- 트레이싱(어디서): 분산 추적(요청이 서비스들을 어떻게 통과).
-- ★ p99가 평균보다 중요: 평균은 좋아도 상위 1% 사용자가 느리면 문제.
+## 3. React Query (TanStack Query)
+정의: 서버 상태(API 데이터)를 관리. 캐싱·동기화·백그라운드 갱신 자동화.
+인과: 전통은 useEffect fetch+useState+로딩/에러/캐싱 전부 수동(보일러플레이트 폭발). RQ는 자동화. "서버 상태는 클라 상태와 다르다"(원본은 서버, 캐시는 사본).
+장점:
+- 캐싱: 캐시에서 즉시 반환, 중복 요청 제거(dedup)
+- stale-while-revalidate: 캐시 즉시 표시+백그라운드 갱신→체감 속도↑
+- 자동 refetch: 창 포커스·재연결 시
+- isLoading/isError 자동
+- 낙관적 업데이트: 응답 전 UI 먼저, 실패 시 롤백
+- 무한 스크롤·페이지네이션 내장
+★ 비동기: 경쟁 상태·취소·재시도를 대신 처리. "서버 데이터면 useEffect 말고 React Query"가 반사.
 
-## ⑨ 이벤트 드리븐 & 메시지 큐 영속성 (NATS/Kafka)
-"서비스가 꺼졌다 켜지면 이벤트가 자동으로 채워짐"의 원리:
-- durable subscription(영속 구독)+offset 추적: 각 컨슈머가 "어디까지 처리했나"를 offset(시퀀스 번호)으로 기록.
-- 브로커가 메시지 영속화(persistence)→서비스 죽어도 유실 안 됨.
-- 재시작 시 "마지막 offset 다음부터" 다시 받음→꺼진 동안 쌓인 이벤트 순서대로 전달=자동으로 채워짐.
-- = at-least-once 전달 보장의 실체. 이벤트 소싱/이벤트 드리븐 아키텍처.
-- 각 MSA가 이벤트를 자기 DB에 저장+다른 서비스도 같은 이벤트 받아 갱신→최종 일관성(eventual).
+## 4. Redux (Redux Toolkit)
+정의: 앱 전역 클라이언트 상태를 예측 가능하게. 단일 스토어+액션+리듀서.
+★ 최신 RTK 표준: 옛 Redux는 보일러플레이트 악명→RTK가 축소. createSlice(리듀서+액션 자동)/configureStore/createAsyncThunk(비동기). RTK Query(내장 데이터 페칭, RQ 유사).
+★ 역할 분담(제일 중요):
+- 서버 상태(API) → React Query(또는 RTK Query)
+- 클라 전역 상태 → Redux/Zustand(모달·테마·필터·인증 UI)
+- 로컬 컴포넌트 → useState
+- 저빈도 전역 → useContext
+- 오해 주의: "Redux에 API 데이터 다 넣기"는 구식. 서버 상태는 RQ, Redux는 순수 클라 전역만.
+- Zustand: Redux보다 가벼운 대안(보일러플레이트 적음). 소규모=Zustand, 복잡·대규모=RTK.
 
-## ⑩ 이벤트 순서 보장 & 넘버링
-- 각 이벤트에 단조 증가 시퀀스 번호(NATS=sequence, Kafka=offset). WAL/LSN과 같은 원리.
-- 컨슈머는 번호 순서대로 처리+"여기까지 처리" commit.
-- 순서 범위: 파티션/스트림 내에서는 순서 보장, 여러 파티션 걸치면 전역 순서 미보장→순서 중요하면 같은 키를 같은 파티션(같은 주문 ID→같은 파티션).
-★ 순서 vs 확장 트레이드오프: 전역 순서 원하면 파티션 1개(병렬 불가, 느림), 확장하려면 여러 개(파티션 내 순서만). 실무: 순서 중요한 단위(주문/사용자 ID)를 파티션 키로→"단위 내 순서+단위 간 병렬".
-- 멱등성 결합: at-least-once라 중복 전달 가능→컨슈머가 이벤트 번호로 "이미 처리?" 확인해 중복 무시. 순서 보장+멱등성이 이벤트 처리 안정성 핵심.
-경험 서술: "NATS Streaming으로 이벤트 드리븐 구성. durable subscription으로 offset 추적해 서비스 재시작 시 놓친 이벤트 순서대로 재생받아 자동 복구. 시퀀스 번호로 순서 보장, at-least-once라 멱등성으로 중복 처리."
+## 5. NestJS 의존성 주입(DI)
+정의: 객체가 의존성을 직접 안 만들고 외부에서 주입받음. Nest 핵심.
+인과: 직접 생성(new Service())은 강결합→테스트 어렵고 교체 불가. DI는 인터페이스 의존+구현 주입→느슨한 결합·테스트 쉬움(목 주입)·재사용.
+구현: @Injectable()(주입 가능 프로바이더)+생성자 주입(constructor(private svc: Service)). IoC 컨테이너가 생명주기 관리+자동 주입. @Module로 등록·스코프.
+★ 본질=관심사 분리+테스트 용이성. "Nest는 DI로 OOP 구조를 강제해 대규모 유지보수 강함"(연상사전). 스프링 DI와 같은 철학.
 
 </script>
 

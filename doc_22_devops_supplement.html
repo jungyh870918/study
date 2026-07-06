@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>시스템 디자인 부가 설명 · 학습 허브</title>
+<title>CI/CD·쿠버네티스 부가 설명 · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_16_sysdesign_basic.html">← 시스템 디자인 기본</a>
-      <a href="doc_18_sysdesign_essentials.html">시스템 디자인 완전 기초 →</a>
+      <a href="doc_21_devops_basic.html">← CI/CD·쿠버네티스 기본</a>
+      <a href="doc_23_devops_essentials.html">CI/CD·쿠버네티스 완전 기초 →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,73 +63,63 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서17] 시스템 디자인 부가 설명 — 난이도 있는 개념 보충
-> 문서16에서 한 번 더 파고들 가치가 있는 것들.
+# [문서22] CI/CD·쿠버네티스 부가 설명 — 난이도 있는 개념 보충
 
 ---
 
-## ① CAP를 넘어 — PACELC
-- CAP: 분할(P) 시 C vs A.
-- PACELC: 분할(P) 시 A vs C, 아니면(Else) 지연(L) vs 일관성(C)까지 확장.
-- 즉 분할 없는 평상시에도 "빠르게(낮은 지연) vs 정확하게(강한 일관성)" 트레이드오프가 있다.
-- 예: DynamoDB=PA/EL(가용·저지연 우선), 전통 RDB=PC/EC(일관성 우선).
+## ① K8s는 어떻게 "원하는 상태"를 유지하나 (Reconciliation Loop)
+- 선언적: "Pod 3개 원함"을 선언 → 컨트롤러가 실제와 비교 → 다르면 조치(하나 죽으면 생성).
+- etcd: 클러스터의 모든 상태를 저장하는 키-값 저장소(진실의 원천).
+- 컨트롤 플레인: API Server(관문)+Scheduler(Pod를 노드에 배치)+Controller Manager(reconcile)+etcd.
+- 워커 노드: kubelet(Pod 실행)+kube-proxy(네트워킹)+컨테이너 런타임.
 
-## ② 최종 일관성의 실제 (충돌 해결)
-- 여러 노드에 동시 쓰기 → 충돌. 해결법:
-  - Last-Write-Wins(타임스탬프 최신 우선, 단순하나 유실 위험)
-  - 벡터 클록(인과관계 추적)
-  - CRDT(수학적으로 병합 가능한 자료구조, 협업 편집)
-- read-your-writes: 방금 쓴 걸 못 읽는 문제 → 쓴 직후엔 마스터로 라우팅.
+## ② EKS에서 AWS가 관리하는 것 vs 내가 하는 것
+- AWS 관리: 컨트롤 플레인(API Server, etcd, Scheduler) — 이중화·업그레이드.
+- 내 몫: 워커 노드(EC2/Fargate), 앱 배포, 네트워킹 설정, 오토스케일 구성.
+- Fargate: 노드 관리도 서버리스로 위임(노드 신경 안 씀). vs 관리형 노드그룹(EC2 직접).
 
-## ③ 일관된 해싱 심화
-- 가상 노드가 없으면 서버 3대일 때 부하가 33%씩 안 나뉘고 치우침 → 각 서버를 링에 100~200번 배치해 균등화.
-- 서버 추가 시 이동하는 키 = 전체/서버수 (예: 3→4대면 약 1/4만 이동).
+## ③ IRSA (IAM Roles for Service Accounts)
+- Pod가 AWS 서비스(S3 등) 접근 시 키 대신 IAM Role을 ServiceAccount에 연결.
+- OIDC 페더레이션으로 Pod에 임시 자격증명 자동 주입(EC2 Instance Profile의 Pod 버전).
+- 키 하드코딩 없이 최소 권한. (AWS편 IAM Role 원리와 동일)
 
-## ④ 큐 vs 스트림
-- 메시지 큐(RabbitMQ): 작업 분배, 소비되면 사라짐.
-- 이벤트 스트림(Kafka): 로그 보존, 여러 컨슈머가 각자 오프셋으로 재생 가능. 이벤트 소싱·재처리에 유리.
-- 선택: 단순 작업 분배=큐, 이벤트 기록·재생·여러 소비자=스트림.
+## ④ Terraform state 심화
+- state = 코드와 실제 인프라의 매핑. 없으면 Terraform이 뭘 만들었는지 모름.
+- 원격 백엔드(S3)+잠금(DynamoDB): 팀이 동시에 apply해도 충돌 방지.
+- terraform import: 콘솔로 만든 기존 리소스를 코드 관리로 편입.
+- 민감정보: state에 평문 저장될 수 있어 암호화·접근 제한 필수.
 
-## ⑤ 캐싱 전략 4종
-- Cache-aside(lazy): 앱이 캐시 확인→없으면 DB→캐시 채움. 가장 흔함.
-- Write-through: 쓸 때 캐시+DB 동시. 읽기 빠름, 쓰기 느림.
-- Write-back: 캐시에만 쓰고 나중에 DB. 빠르지만 유실 위험.
-- Write-around: DB에만 쓰고 캐시는 읽을 때. 쓰고 안 읽는 데이터.
+## ⑤ 헬름(Helm) & Kustomize
+- Helm: K8s 매니페스트의 패키지 매니저. 템플릿+values로 환경별 설정 주입. 차트로 재사용.
+- Kustomize: 베이스 매니페스트에 환경별 오버레이(패치). 템플릿 없이 순수 YAML.
+- 선택: 복잡한 파라미터화=Helm, 단순 환경 차이=Kustomize.
 
-## ⑥ 데이터베이스 종류별 용도
-- RDB(PostgreSQL/MySQL): 정합성·관계·트랜잭션.
-- 문서(MongoDB): 유연 스키마, 중첩 데이터.
-- 키-값(Redis/DynamoDB): 초고속 조회, 캐시·세션.
-- 컬럼(Cassandra): 대용량 쓰기, 시계열.
-- 그래프(Neo4j): 관계 탐색(친구의 친구).
-- 검색(Elasticsearch): 전문 검색, 역색인.
-- 시계열(InfluxDB): 메트릭·로그.
+## ⑥ 시크릿 관리 (GitOps의 난제)
+- Git에 평문 시크릿 금지. 해결:
+  - Sealed Secrets: 암호화해 Git에 저장, 클러스터에서만 복호화.
+  - External Secrets Operator: AWS Secrets Manager에서 실시간 주입.
+  - SOPS: 파일 단위 암호화.
+- ★ GitOps에서 "모든 걸 Git에"와 "시크릿은 Git에 넣으면 안 됨"의 충돌을 이렇게 푼다.
 
-## ⑦ 낙관적 UI & 비동기 패턴
-- 낙관적 업데이트: 서버 응답 전에 UI 먼저 반영(좋아요 즉시 표시)→실패 시 롤백. 체감 속도↑.
-- 폴링 vs 롱폴링 vs WebSocket vs SSE: 실시간성 요구에 따라(채팅=WebSocket, 알림=SSE).
+## ⑦ 배포 전략 상세
+- 롤링: maxSurge(추가 생성 수)/maxUnavailable(동시 중단 수)로 속도·안정 조절.
+- 카나리: 트래픽 가중치를 서비스 메시(Istio)나 인그레스로 조절. 메트릭 보고 자동 승격/롤백(Argo Rollouts, Flagger).
+- 블루-그린: 트래픽 스위치가 순간이라 롤백 즉시. 단 두 배 리소스 필요.
 
-## ⑧ 관측성(Observability) 3축
-- 로그(무슨 일이): 구조화 로깅+요청 ID.
-- 메트릭(얼마나): QPS, 지연 p50/p99, 에러율.
-- 트레이싱(어디서): 분산 추적(요청이 서비스들을 어떻게 통과).
-- ★ p99가 평균보다 중요: 평균은 좋아도 상위 1% 사용자가 느리면 문제.
+## ⑧ 파이프라인 보안 (DevSecOps)
+- SAST(SonarQube): 코드 정적 분석.
+- SCA(Snyk): 의존성 취약점.
+- 이미지 스캔(Trivy): 컨테이너 취약점.
+- IaC 스캔(tfsec/Checkov): Terraform 보안.
+- 이미지 서명(cosign): 공급망 무결성.
+- OPA/Gatekeeper: 클러스터 정책 강제(예: 권한 있는 컨테이너 금지).
+- ★ 각 단계가 게이트: 심각 취약점이면 파이프라인 중단.
 
-## ⑨ 이벤트 드리븐 & 메시지 큐 영속성 (NATS/Kafka)
-"서비스가 꺼졌다 켜지면 이벤트가 자동으로 채워짐"의 원리:
-- durable subscription(영속 구독)+offset 추적: 각 컨슈머가 "어디까지 처리했나"를 offset(시퀀스 번호)으로 기록.
-- 브로커가 메시지 영속화(persistence)→서비스 죽어도 유실 안 됨.
-- 재시작 시 "마지막 offset 다음부터" 다시 받음→꺼진 동안 쌓인 이벤트 순서대로 전달=자동으로 채워짐.
-- = at-least-once 전달 보장의 실체. 이벤트 소싱/이벤트 드리븐 아키텍처.
-- 각 MSA가 이벤트를 자기 DB에 저장+다른 서비스도 같은 이벤트 받아 갱신→최종 일관성(eventual).
-
-## ⑩ 이벤트 순서 보장 & 넘버링
-- 각 이벤트에 단조 증가 시퀀스 번호(NATS=sequence, Kafka=offset). WAL/LSN과 같은 원리.
-- 컨슈머는 번호 순서대로 처리+"여기까지 처리" commit.
-- 순서 범위: 파티션/스트림 내에서는 순서 보장, 여러 파티션 걸치면 전역 순서 미보장→순서 중요하면 같은 키를 같은 파티션(같은 주문 ID→같은 파티션).
-★ 순서 vs 확장 트레이드오프: 전역 순서 원하면 파티션 1개(병렬 불가, 느림), 확장하려면 여러 개(파티션 내 순서만). 실무: 순서 중요한 단위(주문/사용자 ID)를 파티션 키로→"단위 내 순서+단위 간 병렬".
-- 멱등성 결합: at-least-once라 중복 전달 가능→컨슈머가 이벤트 번호로 "이미 처리?" 확인해 중복 무시. 순서 보장+멱등성이 이벤트 처리 안정성 핵심.
-경험 서술: "NATS Streaming으로 이벤트 드리븐 구성. durable subscription으로 offset 추적해 서비스 재시작 시 놓친 이벤트 순서대로 재생받아 자동 복구. 시퀀스 번호로 순서 보장, at-least-once라 멱등성으로 중복 처리."
+## ⑨ 관측성 (운영)
+- 로그: EKS→CloudWatch/Loki. 요청 ID로 추적.
+- 메트릭: Prometheus+Grafana. HPA도 이 메트릭 기반.
+- 트레이싱: 분산 추적(Jaeger).
+- ★ Pod가 죽고 사는 환경이라 개별 서버가 아닌 집계·라벨 기반 관측 필수.
 
 </script>
 

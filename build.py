@@ -38,6 +38,9 @@ TOPIC_LABEL = {
     "algorithm": "자료구조·알고리즘",
     "algo": "자료구조·알고리즘",
     "sysdesign": "시스템 디자인",
+    "devops": "CI/CD·쿠버네티스",
+    "frontend": "인증·프론트엔드",
+    "domain": "도메인 설계 사례",
     "ds": "자료구조·알고리즘",
     "os": "운영체제",
 }
