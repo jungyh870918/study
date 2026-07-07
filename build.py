@@ -32,6 +32,8 @@ KIND_META = {
     "techdeep":           {"label": "기술 심화",    "desc": "구체적으로 어떻게 짰나 · 파일·구조·라이브러리", "color": "#4f46e5"},
     "dbaccess":           {"label": "DB 접근 전략",  "desc": "ORM & 생 SQL · 실제 코드 기반",              "color": "#6366f1"},
     "backendfiles":       {"label": "백엔드 파일 분류","desc": "실측 파일 역할 · 런타임 표면적 · 레거시",     "color": "#7c3aed"},
+    "nextfeatures":       {"label": "Next.js 활용", "desc": "App Router 기능별 실제 구현 정리",             "color": "#0f172a"},
+    "sqlmastery":         {"label": "SQL 실전 범위","desc": "실제 프로젝트 쿼리로 본 다뤄본 범위",           "color": "#155e75"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -48,10 +50,12 @@ TOPIC_LABEL = {
     "ds": "자료구조·알고리즘",
     "os": "운영체제",
     "voyage": "프로젝트: Voyage",
+    "jceye": "프로젝트: 병원결제(Next)",
+    "allscape": "프로젝트: 감리시스템(SQL)",
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery"]
 
 
 def parse_filename(fn):
