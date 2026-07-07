@@ -34,6 +34,7 @@ KIND_META = {
     "backendfiles":       {"label": "백엔드 파일 분류","desc": "실측 파일 역할 · 런타임 표면적 · 레거시",     "color": "#7c3aed"},
     "nextfeatures":       {"label": "Next.js 활용", "desc": "App Router 기능별 실제 구현 정리",             "color": "#0f172a"},
     "sqlmastery":         {"label": "SQL 실전 범위","desc": "실제 프로젝트 쿼리로 본 다뤄본 범위",           "color": "#155e75"},
+    "authimpl":           {"label": "인증 구현",    "desc": "JWT·리프레시 로테이션·OAuth·가드 실제 코드",  "color": "#be123c"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -52,10 +53,11 @@ TOPIC_LABEL = {
     "voyage": "프로젝트: Voyage",
     "jceye": "프로젝트: 병원결제(Next)",
     "allscape": "프로젝트: 감리시스템(SQL)",
+    "authsrv": "프로젝트: 인증서버(Nest)",
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl"]
 
 
 def parse_filename(fn):
