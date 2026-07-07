@@ -30,6 +30,8 @@ KIND_META = {
     "tech_association":   {"label": "기술 연상 사전", "desc": "기술명 → 즉시 따라나올 실무 키워드 묶음",     "color": "#9333ea"},
     "overview":           {"label": "프로젝트 개요", "desc": "왜 이렇게 설계했나 · 문제→선택→이유→결과",   "color": "#0891b2"},
     "techdeep":           {"label": "기술 심화",    "desc": "구체적으로 어떻게 짰나 · 파일·구조·라이브러리", "color": "#4f46e5"},
+    "dbaccess":           {"label": "DB 접근 전략",  "desc": "ORM & 생 SQL · 실제 코드 기반",              "color": "#6366f1"},
+    "backendfiles":       {"label": "백엔드 파일 분류","desc": "실측 파일 역할 · 런타임 표면적 · 레거시",     "color": "#7c3aed"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -49,7 +51,7 @@ TOPIC_LABEL = {
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles"]
 
 
 def parse_filename(fn):

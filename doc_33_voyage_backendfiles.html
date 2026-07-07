@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CI/CD·쿠버네티스 부가 설명 · 학습 허브</title>
+<title>프로젝트 Voyage · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_21_devops_basic.html">← CI/CD·쿠버네티스 기본</a>
-      <a href="doc_23_devops_essentials.html">CI/CD·쿠버네티스 완전 기초 →</a>
+      <a href="doc_32_voyage_dbaccess.html">← 프로젝트 Voyage</a>
+      <span></span>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,63 +63,69 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서22] CI/CD·쿠버네티스 부가 설명 — 난이도 있는 개념 보충
+# [문서33] 프로젝트 Voyage — 백엔드 파일 역할 분류
+> 문서31의 파일 구성을 실제 코드로 검증·분류. 전체 37개 .py / 55,730줄.
+> ★ 문서31과 다른 발견: 미참조 레거시 5개, content.py가 전체의 88%(데이터).
 
 ---
 
-## ① K8s는 어떻게 "원하는 상태"를 유지하나 (Reconciliation Loop)
-- 선언적: "Pod 3개 원함"을 선언 → 컨트롤러가 실제와 비교 → 다르면 조치(하나 죽으면 생성).
-- etcd: 클러스터의 모든 상태를 저장하는 키-값 저장소(진실의 원천).
-- 컨트롤 플레인: API Server(관문)+Scheduler(Pod를 노드에 배치)+Controller Manager(reconcile)+etcd.
-- 워커 노드: kubelet(Pod 실행)+kube-proxy(네트워킹)+컨테이너 런타임.
+## 핵심 한 줄
+"FastAPI 라우트를 가진 파일은 main.py 단 하나. 나머지는 라이브러리 모듈 아니면 오프라인 스크립트. 런타임 표면적은 작고(main+조회/채점/음원/STT+core), 코드의 88%(content.py 49k줄)는 '로직'이 아니라 콘텐츠 데이터. batches→content.py→migrate→DB→content_db 단방향 흐름."
 
-## ② EKS에서 AWS가 관리하는 것 vs 내가 하는 것
-- AWS 관리: 컨트롤 플레인(API Server, etcd, Scheduler) — 이중화·업그레이드.
-- 내 몫: 워커 노드(EC2/Fargate), 앱 배포, 네트워킹 설정, 오토스케일 구성.
-- Fargate: 노드 관리도 서버리스로 위임(노드 신경 안 씀). vs 관리형 노드그룹(EC2 직접).
+## A. 콘텐츠 생성 / 데이터 파이프라인 (오프라인)
+- services/content.py (49,042줄): 콘텐츠 원본 데이터 배열(대사·표현·발음·리액션). 런타임 미로드, migrate 소스.
+- migrate_content.py (235): content.py→lessons 테이블 upsert(ALTER 생SQL+ORM add/update).
+- generate_all.py (241): 음원 배치 자동생성(TTS→믹싱→timeline).
+- push_quality_scores.py (71): 채점 결과(json)를 DB 반영.
+- rebuild_reaction/fix_pronunciation/fix_reaction (346/84/85): E시리즈 포맷 변환·재구성.
+- upload_existing_audio/upload_illustrations (160/121): 음원·삽화 R2 일괄 업로드.
+- generate_card_webp (94): 삽화 WebP 변형+LQIP blur 생성.
+- regen_illustrations_32/regen_swap/crop_replace (104/104/107): 삽화 재생성·crop·R2 교체.
+- insert_sample_records (121): 학습 달력 테스트용 샘플 DB 삽입.
+★ content.py 49,042줄 = 전체 코드의 88%. 면접에서 반드시 "이건 로직이 아니라 데이터"라고 명확히. "코드 5.5만 줄"이 아니라 "데이터 소스가 대부분, 실제 로직은 작다."
 
-## ③ IRSA (IAM Roles for Service Accounts)
-- Pod가 AWS 서비스(S3 등) 접근 시 키 대신 IAM Role을 ServiceAccount에 연결.
-- OIDC 페더레이션으로 Pod에 임시 자격증명 자동 주입(EC2 Instance Profile의 Pod 버전).
-- 키 하드코딩 없이 최소 권한. (AWS편 IAM Role 원리와 동일)
+## B. 런타임 — 라우팅 + 비즈니스 로직
+- app/main.py (1,676): 유일한 FastAPI 앱. 47개 엔드포인트(음원 서빙, 레슨 조회, 채점 /api/score, STT, 유저 동기화, 통계/스트릭, 북마크/플레이리스트/스케줄/메모/노트/프로필).
+- api.py (3): from app.main import app — 배포 진입점(ASGI).
+- services/content_db.py (103): 런타임 콘텐츠 조회 계층. lessons 테이블→dict. main.py가 content.py 대신 이걸 씀.
+- services/scoring.py (235): 발화 채점(표면유사도+코사인+키워드 cap). STT 벤더와 분리.
+- services/audio_pipeline.py (655): 7단계 학습 음원 파이프라인(화자 보이스 매핑, timeline 빌드).
+- services/share_page.py (288): /s/{lesson_id} 공유 페이지 HTML 렌더.
 
-## ④ Terraform state 심화
-- state = 코드와 실제 인프라의 매핑. 없으면 Terraform이 뭘 만들었는지 모름.
-- 원격 백엔드(S3)+잠금(DynamoDB): 팀이 동시에 apply해도 충돌 방지.
-- terraform import: 콘솔로 만든 기존 리소스를 코드 관리로 편입.
-- 민감정보: state에 평문 저장될 수 있어 암호화·접근 제한 필수.
+### ⚠️ 미참조 레거시 (코드 확인됨 — 정직하게 말할 카드)
+- services/session_builder.py (71): 어디서도 import 안 됨 → 초기 Dialogue 설계 잔재.
+- services/pm6r_builder.py (256): 미참조 → audio_pipeline으로 대체된 듯.
+- services/db_service.py (86): 미참조 → 초기 Dialogue 모델용 레거시.
 
-## ⑤ 헬름(Helm) & Kustomize
-- Helm: K8s 매니페스트의 패키지 매니저. 템플릿+values로 환경별 설정 주입. 차트로 재사용.
-- Kustomize: 베이스 매니페스트에 환경별 오버레이(패치). 템플릿 없이 순수 YAML.
-- 선택: 복잡한 파라미터화=Helm, 단순 환경 차이=Kustomize.
+## C. 외부 연동 / 인프라 (core)
+- core/tts_service.py (228): ElevenLabs TTS 래퍼+캐시.
+- core/r2_storage.py (115): Cloudflare R2(S3호환) 업로드/URL/존재확인.
+- services/stt_client.py (137): OpenAI Whisper STT+임베딩(컨테이너 sniff, ffmpeg wav 변환).
+- app/db.py (79): DB 엔진 — Railway PG 주/Neon 폴백/SQLite 로컬.
+- app/models_db.py (202): SQLAlchemy 모델 14종.
+- app/init_db.py (43): create_all+ALTER 컬럼 보강.
+- core/models.py (110): dataclass/Enum 도메인 타입.
+- core/cache.py (2): TTSService 재-export shim.
+★ 벤더 격리: tts_service/r2_storage/stt_client가 외부 API를 각각 얇은 래퍼로 분리. "벤더 교체 시 이 파일만 갈아끼운다"는 설계. scoring도 STT 벤더와 분리.
 
-## ⑥ 시크릿 관리 (GitOps의 난제)
-- Git에 평문 시크릿 금지. 해결:
-  - Sealed Secrets: 암호화해 Git에 저장, 클러스터에서만 복호화.
-  - External Secrets Operator: AWS Secrets Manager에서 실시간 주입.
-  - SOPS: 파일 단위 암호화.
-- ★ GitOps에서 "모든 걸 Git에"와 "시크릿은 Git에 넣으면 안 됨"의 충돌을 이렇게 푼다.
+## D. 유틸 (보조 — 현 런타임 연결 불명확)
+- core/chunker.py (95): 문장→청크 분할. 레거시 빌더만 사용.
+- core/templates.py (108): 학습 스텝 템플릿. 참조처 없음 → 레거시.
+- utils/mixer.py (32): TTS+BGM 믹싱(pydub). import 안 됨 → 오프라인/잔재.
 
-## ⑦ 배포 전략 상세
-- 롤링: maxSurge(추가 생성 수)/maxUnavailable(동시 중단 수)로 속도·안정 조절.
-- 카나리: 트래픽 가중치를 서비스 메시(Istio)나 인그레스로 조절. 메트릭 보고 자동 승격/롤백(Argo Rollouts, Flagger).
-- 블루-그린: 트래픽 스위치가 순간이라 롤백 즉시. 단 두 배 리소스 필요.
+## E. 오프라인 스크립트 / 테스트
+- test_scoring.py (67): 채점 곡선 검증(실 임베딩으로 점수 분포).
+- test_meta_regression.py (115): 메타 채점 회귀 테스트(메타 ON/OFF 비교).
+- _check_step2.py (102): 콘텐츠 검증(레슨 108개, practice 키, assert). content.py 직접 로드하는 유일한 곳.
 
-## ⑧ 파이프라인 보안 (DevSecOps)
-- SAST(SonarQube): 코드 정적 분석.
-- SCA(Snyk): 의존성 취약점.
-- 이미지 스캔(Trivy): 컨테이너 취약점.
-- IaC 스캔(tfsec/Checkov): Terraform 보안.
-- 이미지 서명(cosign): 공급망 무결성.
-- OPA/Gatekeeper: 클러스터 정책 강제(예: 권한 있는 컨테이너 금지).
-- ★ 각 단계가 게이트: 심각 취약점이면 파이프라인 중단.
+## 면접 포인트 (이 분류에서 나오는 이야기)
+1. 런타임 표면적은 작다. 실제 서버가 도는 코드는 main.py+content_db/scoring/audio_pipeline/share_page/stt_client+core(tts/r2/db/models). content.py(49k)는 데이터 소스. → "코드량"이 아니라 "런타임에 실제 도는 것"으로 규모를 말하는 게 정확.
+2. 벤더 격리 설계. 외부 API(TTS/STT/R2)를 각각 얇은 래퍼로. 교체 시 그 파일만.
+3. 데이터 흐름 단방향. batches/*.json→content.py→migrate→DB→content_db(런타임 조회). DB 직접 수정 안 함(SSOT). 문서30·31의 원칙과 코드가 일치.
+4. 레거시 잔재를 정직하게. pm6r_builder·session_builder·db_service·templates·mixer는 현 런타임 미참조. 초기 "PM6R/Dialogue" 설계가 현재 audio_pipeline+lessons 테이블로 전환된 흔적. → 물으면 "구조 전환의 흔적, 정리 대상으로 인지하고 있다"로 답하는 게 오히려 신뢰(모르는 척하거나 "다 쓴다"고 하면 역효과).
 
-## ⑨ 관측성 (운영)
-- 로그: EKS→CloudWatch/Loki. 요청 ID로 추적.
-- 메트릭: Prometheus+Grafana. HPA도 이 메트릭 기반.
-- 트레이싱: 분산 추적(Jaeger).
-- ★ Pod가 죽고 사는 환경이라 개별 서버가 아닌 집계·라벨 기반 관측 필수.
+## 핵심 요약
+main.py 단일 FastAPI(47라우트). content.py는 88%가 데이터. 런타임=조회/채점/음원/STT+core. 외부 API는 얇은 래퍼로 벤더 격리. 흐름은 batch→content→migrate→DB→content_db 단방향. 미참조 레거시 5개는 PM6R/Dialogue 초기 설계의 잔재로 인지 중.
 
 </script>
 

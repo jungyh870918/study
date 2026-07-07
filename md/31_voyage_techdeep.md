@@ -20,6 +20,7 @@ SQLAlchemy(ORM):
 왜 ORM: 로컬 SQLite↔운영 PostgreSQL을 코드 변경 없이. 개발 SQLite, 배포 PG로 같은 모델 재사용.
 왜 메인-폴백: 운영 DB 장애 대비. ★ 함정: migrate가 쓴 DB와 앱이 읽는 DB가 다르면 "migrate는 됐는데 앱엔 안 뜸". 그래서 반영 후 "앱이 읽는 DB에 직접 COUNT 쿼리"로 정합성 확인 절차. (이 함정을 안다는 것 자체가 면접 포인트)
 JSON 컬럼 활용: practice(dialogue 배열)는 정규화 안 하고 PostgreSQL JSON 컬럼에 통째로. 레슨 콘텐츠는 함께 읽고 쓰는 단위라 조인보다 JSON이 단순·빠름. references/critical_keywords 채점 메타도 이 JSON 안에.
+→ ORM vs 생 SQL 경계의 실제 코드는 문서32(DB 접근 전략), 백엔드 파일별 역할 실측은 문서33.
 
 ## 3. 백엔드 — 스키마 설계
 콘텐츠 스키마(레슨 JSON) — 단일 진실원:
@@ -35,7 +36,7 @@ DB 스키마(운영): lessons 테이블 — id, level, category, title, practice
 ## 4. 백엔드 — 주요 파일 구성
 ```
 backend/app/
-├── main.py              FastAPI 엔트리 — 45개 라우트
+├── main.py              FastAPI 엔트리 — 47개 라우트(실측)
 ├── db.py                DB 엔진(Railway 메인/Neon 폴백/SQLite 로컬)
 ├── init_db.py           테이블 초기화
 ├── models_db.py         SQLAlchemy 모델
@@ -60,6 +61,7 @@ backend/ (루트 스크립트)
 - core=외부 연동(TTS,R2,캐시) / services=우리 도메인 로직(콘텐츠,채점,음원 합성). 외부 의존과 내부 로직 분리.
 - 런타임(main.py) vs 오프라인 스크립트(generate_all/migrate) 분리. 무거운 배치는 API에서 빼서 스크립트로. Railway 타임아웃 회피+관심사 분리.
 - content.py=콘텐츠 단일 소스. DB는 파생물. 항상 batches JSON→content.py→migrate→DB로만.
+★ 실측(문서33): content.py는 49k줄로 전체 코드의 88%(로직 아니라 데이터). 런타임 라우트는 main.py 단 하나(47개). 미참조 레거시 5개(pm6r_builder 등)는 PM6R/Dialogue 초기 설계 잔재로 인지 중.
 주요 API:
 GET /api/lessons(목록) / GET /api/lesson/{id}(상세) / GET /api/stats(통계) / POST /api/session/start·complete / GET /audio/{hash}.mp3(캐시 음원) / POST /api/users/sync(Supabase JWT 검증, 여기서만).
 

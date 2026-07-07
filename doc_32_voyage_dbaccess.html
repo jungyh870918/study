@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CI/CD·쿠버네티스 부가 설명 · 학습 허브</title>
+<title>프로젝트 Voyage · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_21_devops_basic.html">← CI/CD·쿠버네티스 기본</a>
-      <a href="doc_23_devops_essentials.html">CI/CD·쿠버네티스 완전 기초 →</a>
+      <a href="doc_31_voyage_techdeep.html">← 프로젝트 Voyage</a>
+      <a href="doc_33_voyage_backendfiles.html">프로젝트 Voyage →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,63 +63,57 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서22] CI/CD·쿠버네티스 부가 설명 — 난이도 있는 개념 보충
+# [문서32] 프로젝트 Voyage — ORM & 생 SQL (DB 접근 전략)
+> 문서31의 "왜 ORM?" 질문에 대한 실제 코드 기반 답변.
+> 핵심 서사: ORM이 기본, 생 SQL은 명확히 두 경우(DDL·헬스체크)에만. 경계가 일관된 게 강점.
 
 ---
 
-## ① K8s는 어떻게 "원하는 상태"를 유지하나 (Reconciliation Loop)
-- 선언적: "Pod 3개 원함"을 선언 → 컨트롤러가 실제와 비교 → 다르면 조치(하나 죽으면 생성).
-- etcd: 클러스터의 모든 상태를 저장하는 키-값 저장소(진실의 원천).
-- 컨트롤 플레인: API Server(관문)+Scheduler(Pod를 노드에 배치)+Controller Manager(reconcile)+etcd.
-- 워커 노드: kubelet(Pod 실행)+kube-proxy(네트워킹)+컨테이너 런타임.
+## 핵심 한 줄
+"애플리케이션의 모든 CRUD·조회·집계는 SQLAlchemy ORM으로, 생 SQL은 ORM이 다루기 힘든 DDL(ALTER TABLE 컬럼 추가)과 연결 헬스체크(SELECT 1)에만 국소적으로 썼다. '데이터는 ORM, 스키마 변경은 생 SQL'이라는 경계가 코드 전체에서 일관된다."
 
-## ② EKS에서 AWS가 관리하는 것 vs 내가 하는 것
-- AWS 관리: 컨트롤 플레인(API Server, etcd, Scheduler) — 이중화·업그레이드.
-- 내 몫: 워커 노드(EC2/Fargate), 앱 배포, 네트워킹 설정, 오토스케일 구성.
-- Fargate: 노드 관리도 서버리스로 위임(노드 신경 안 씀). vs 관리형 노드그룹(EC2 직접).
+## 1. 왜 ORM을 기본으로?
+- 로컬 SQLite↔운영 PostgreSQL 무변경 전환. 같은 모델(models_db.py)로 개발은 SQLite, 배포는 PG. 방언 차이를 ORM이 흡수 → 코드 한 벌로 두 DB.
+- 관계는 relationship(back_populates)으로 선언 → 명시적 .join() 없이 FK 기반 조인을 ORM 관계에 위임. lazy-load로 필요 시 로드.
+- 타입 안전·가독성. db.query(User).filter(User.id == uid).first()가 SQL 문자열보다 명확.
 
-## ③ IRSA (IAM Roles for Service Accounts)
-- Pod가 AWS 서비스(S3 등) 접근 시 키 대신 IAM Role을 ServiceAccount에 연결.
-- OIDC 페더레이션으로 Pod에 임시 자격증명 자동 주입(EC2 Instance Profile의 Pod 버전).
-- 키 하드코딩 없이 최소 권한. (AWS편 IAM Role 원리와 동일)
+ORM 대표 3패턴(실제 코드):
+- 단순 조회(main.py:790): db.query(User).filter(User.id == user_id).first() — PK 단건, 없으면 None. 가장 흔함.
+- 복합 필터+정렬(main.py:303): user_id+날짜 범위(>=, <)를 복합 필터 → .order_by(started_at.asc()).all() 체인. 집계도 ORM .count()(main.py:1006).
+- 쓰기(main.py:1291): ScheduleEntry(...) → db.add → db.commit → db.refresh(autoincrement id 회수). 쓰기 전 ORM으로 중복 확인까지.
 
-## ④ Terraform state 심화
-- state = 코드와 실제 인프라의 매핑. 없으면 Terraform이 뭘 만들었는지 모름.
-- 원격 백엔드(S3)+잠금(DynamoDB): 팀이 동시에 apply해도 충돌 방지.
-- terraform import: 콘솔로 만든 기존 리소스를 코드 관리로 편입.
-- 민감정보: state에 평문 저장될 수 있어 암호화·접근 제한 필수.
+## 2. 생 SQL은 정확히 두 경우만
+(a) 연결 헬스체크 — db.py:45
+  with eng.connect() as conn: conn.execute(text("SELECT 1"))
+Railway(메인)→Neon(폴백) 폴백 로직에서 "이 DB URL이 살아있나" 판정용 최소 쿼리. ORM 모델과 무관한 순수 커넥션 테스트라 text()가 자연스러움.
 
-## ⑤ 헬름(Helm) & Kustomize
-- Helm: K8s 매니페스트의 패키지 매니저. 템플릿+values로 환경별 설정 주입. 차트로 재사용.
-- Kustomize: 베이스 매니페스트에 환경별 오버레이(패치). 템플릿 없이 순수 YAML.
-- 선택: 복잡한 파라미터화=Helm, 단순 환경 차이=Kustomize.
+(b) 런타임 스키마 마이그레이션(DDL) — init_db.py / migrate_content.py
+  stmts = ["ALTER TABLE users ADD COLUMN avatar VARCHAR(40)", ...]
+  if is_pg: stmts = [s.replace("ADD COLUMN", "ADD COLUMN IF NOT EXISTS") for s in stmts]
+  for s in stmts: try: conn.execute(text(s)); conn.commit() except: conn.rollback()  # SQLite: 이미 있으면 무시
+★ 왜 생 SQL? Base.metadata.create_all()은 없는 테이블만 만들고 기존 테이블에 새 컬럼은 안 붙인다. Alembic 도입하기엔 규모가 작아 가볍게 DDL 직접 실행. PG는 IF NOT EXISTS, SQLite는 예외 무시로 방언 차이까지 흡수. lessons 테이블의 코칭·삽화 컬럼 사후 추가(migrate_content.py:88)도 같은 구조·이유.
 
-## ⑥ 시크릿 관리 (GitOps의 난제)
-- Git에 평문 시크릿 금지. 해결:
-  - Sealed Secrets: 암호화해 Git에 저장, 클러스터에서만 복호화.
-  - External Secrets Operator: AWS Secrets Manager에서 실시간 주입.
-  - SOPS: 파일 단위 암호화.
-- ★ GitOps에서 "모든 걸 Git에"와 "시크릿은 Git에 넣으면 안 됨"의 충돌을 이렇게 푼다.
+## 3. 혼용 지점 — 한 흐름에서 역할 분담
+migrate_content.py가 대표적. 같은 마이그레이션 실행 안에서:
+1. 생 SQL(DDL): ensure_columns()가 ALTER TABLE ADD COLUMN — 스키마 보강
+2. ORM(DML): upsert 루프 — db.query(Lesson).filter(...).first()로 조회, 있으면 setattr 업데이트 / 없으면 db.add, --reset이면 db.query(Lesson).delete()
+3. ORM 검증: db.query(Lesson).count()로 건수 확인
+→ 컬럼 존재 보장(생 SQL) → 행 upsert(ORM) → 건수 카운트(ORM) 순. DDL만 생 SQL, 데이터·검증은 ORM이라는 경계가 한 파일 안에서도 지켜짐.
+init_db.py도 유사: create_all()(ORM 메타)+ensure_user_columns()의 ALTER(생 SQL) 연달아 호출.
 
-## ⑦ 배포 전략 상세
-- 롤링: maxSurge(추가 생성 수)/maxUnavailable(동시 중단 수)로 속도·안정 조절.
-- 카나리: 트래픽 가중치를 서비스 메시(Istio)나 인그레스로 조절. 메트릭 보고 자동 승격/롤백(Argo Rollouts, Flagger).
-- 블루-그린: 트래픽 스위치가 순간이라 롤백 즉시. 단 두 배 리소스 필요.
+## 4. 정합성 검증은 어떻게?
+- DB 레벨: 생 SQL COUNT 비교는 없음. ORM .count()로 대체(migrate_content.py:225 등).
+- 콘텐츠 레벨: DB가 아니라 파일/모델 단계에서 파이썬 assert로 검증(예: assert len(LESSONS)==108, 삽화 업로드 시 중복/누락 ID 검사). SQL 정합성이 아니라 파이프라인 입력 검증.
+- 결론: "생 SQL 정합성 쿼리"는 없음. 정합성 = ORM .count() + 파이썬 assert.
 
-## ⑧ 파이프라인 보안 (DevSecOps)
-- SAST(SonarQube): 코드 정적 분석.
-- SCA(Snyk): 의존성 취약점.
-- 이미지 스캔(Trivy): 컨테이너 취약점.
-- IaC 스캔(tfsec/Checkov): Terraform 보안.
-- 이미지 서명(cosign): 공급망 무결성.
-- OPA/Gatekeeper: 클러스터 정책 강제(예: 권한 있는 컨테이너 금지).
-- ★ 각 단계가 게이트: 심각 취약점이면 파이프라인 중단.
+## 5. 예상 질문 대비
+- "왜 전부 ORM 안 쓰고 생 SQL을 섞었나?" → ORM은 기존 테이블에 컬럼 추가(ALTER)를 안 해준다. Alembic은 규모 대비 과해서 DDL만 생 SQL로 가볍게. 데이터 조작은 전부 ORM.
+- "왜 Alembic을 안 썼나?" → 개인/소규모라 컬럼 몇 개 추가에 Alembic은 오버. IF NOT EXISTS+예외 무시로 멱등하게. 규모 커지면 Alembic 전환이 맞다(트레이드오프 인지).
+- "조인은?" → 명시적 .join() 대신 relationship(back_populates)으로 선언, 필요 시 lazy-load.
+- "생 SQL 인젝션 위험은?" → 생 SQL은 전부 하드코딩된 DDL 문자열(사용자 입력 안 들어감). 사용자 입력 닿는 경로는 100% ORM이라 파라미터 바인딩으로 안전.
 
-## ⑨ 관측성 (운영)
-- 로그: EKS→CloudWatch/Loki. 요청 ID로 추적.
-- 메트릭: Prometheus+Grafana. HPA도 이 메트릭 기반.
-- 트레이싱: 분산 추적(Jaeger).
-- ★ Pod가 죽고 사는 환경이라 개별 서버가 아닌 집계·라벨 기반 관측 필수.
+## 핵심 요약
+ORM 기본 / 생 SQL은 DDL·헬스체크 한정. 경계가 일관됨. 관계는 relationship에 위임, 정합성은 ORM count+assert. SQLite↔PG 무변경이 ORM 채택의 실질 이유, DDL 한계가 생 SQL의 이유.
 
 </script>
 
