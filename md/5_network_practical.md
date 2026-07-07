@@ -461,3 +461,68 @@ AWS Lambda:
 
 다른 서버리스: Fargate(컨테이너 서버리스, 긴 작업), DynamoDB(NoSQL), S3(스토리지), API Gateway(API 관문). 조합하면 서버 0대로 완전한 서비스.
 연결: 함수형 API=이벤트 드리븐의 서버리스 버전 / 오토스케일을 AWS가 함수 레벨 자동 / 무상태 강제(상태 외부화).
+
+## 19. AWS 기본 서비스 지도 (카테고리별 대표 서비스)
+큰 그림: 200개+ 서비스지만 5년차 핵심은 카테고리별 대표 1~2개. "이름-역할-언제 쓰나" 수준으로 넓고 얕게(핵심 개념은 깊게, 도구는 넓게 원칙).
+
+### 컴퓨팅 (코드 실행)
+- EC2: 가상 서버. OS부터 직접 관리, 가장 유연·관리 부담 큼. "클라우드 위 내 서버 한 대."
+- Lambda: 서버리스 함수. 요청 올 때만 실행·쓴 만큼 과금·관리 없음.
+- ECS/EKS: 컨테이너 오케스트레이션. ECS=AWS 고유(간단), EKS=관리형 쿠버네티스(표준).
+- Fargate: 컨테이너를 서버리스로(노드 관리 없이). ECS/EKS와 결합.
+★ 선택: 완전한 제어·상시=EC2, 간헐적·이벤트=Lambda, 컨테이너=ECS/EKS, 노드 관리 싫으면 Fargate.
+
+### 스토리지
+- S3: 객체 스토리지. 파일·이미지·백업·정적 사이트. 무한 용량·저렴·고내구성. 가장 많이 씀.
+- EBS: EC2에 붙이는 디스크(블록). 한 인스턴스에 붙음. DB 데이터 등.
+- EFS: 여러 EC2가 공유하는 파일 시스템.
+★ 구분: 파일 저장·서빙=S3, EC2 디스크=EBS(한 대), 여러 서버 공유=EFS.
+
+### 데이터베이스
+- RDS: 관리형 관계형 DB(MySQL/PostgreSQL/Aurora). 백업·복제·패치를 AWS가. ("DB는 RDS가 대개 낫다")
+- Aurora: AWS 제작 고성능 관계형(MySQL/PG 호환). RDS 상위.
+- DynamoDB: 관리형 NoSQL. 서버리스·자동 확장·밀리초. 대규모 확장 강함.
+- ElastiCache: 관리형 Redis/Memcached. 캐싱·세션.
+★ 선택: 정형·트랜잭션=RDS/Aurora, 대규모·유연 스키마=DynamoDB, 캐시=ElastiCache.
+
+### 네트워킹
+- VPC: 내 가상 네트워크. 서브넷·라우팅·방화벽 격리.
+- Route 53: DNS. 도메인·이름 해석·헬스체크 라우팅.
+- CloudFront: CDN. 정적 자원 엣지 서빙(전세계 캐싱).
+- ELB: 로드 밸런서. ALB(L7/HTTP)·NLB(L4/TCP).
+- API Gateway: API 관문. 서버리스 API·rate limit·인증.
+★ 흐름: 사용자→Route 53(DNS)→CloudFront(CDN)→ELB(분산)→EC2/Lambda, 전체가 VPC 안.
+
+### 보안/권한
+- IAM: 사용자·역할·권한. "누가 무엇을." 최소 권한.
+- Security Group: 인스턴스 방화벽(허용 규칙). vs NACL(서브넷).
+- Secrets Manager/Parameter Store: 시크릿 저장·회전.
+- KMS: 암호화 키 관리. Cognito: 사용자 인증·회원관리.
+★ IAM Role로 키 없이 권한(IRSA·OIDC), 시크릿은 Secrets Manager, 방화벽은 SG.
+
+### 배포/운영
+- CloudWatch: 모니터링·로그·메트릭·알람.
+- CloudFormation: IaC(AWS 네이티브, Terraform은 멀티클라우드).
+- ECR: Docker 이미지 저장소.
+- CodePipeline/Build/Deploy: CI/CD.
+- CloudTrail: API 호출 감사 로그.
+
+### 메시징/비동기
+- SQS: 메시지 큐. 작업 완충·비동기 분리(1:1).
+- SNS: 발행-구독 알림(1:N 팬아웃, 푸시·이메일·SMS).
+- EventBridge: 이벤트 버스(서비스 간 라우팅).
+- Kinesis: 실시간 스트리밍.
+★ 구분: 작업 큐=SQS, 알림 팬아웃=SNS, 이벤트 라우팅=EventBridge, 스트림=Kinesis.
+
+### 전형적 웹 서비스 아키텍처 (조합)
+사용자→Route 53(DNS)→CloudFront(CDN)→ALB(분산)→ECS/EKS·EC2(앱, Auto Scaling)→RDS(DB)+ElastiCache(캐시)→S3(파일). SQS로 비동기, CloudWatch로 모니터링, IAM으로 권한, 전체가 VPC 안.
+★ 이 그림에 배운 게 다: CDN·LB·오토스케일·캐시·큐·모니터링(트래픽 핸들링)+VPC·IAM(네트워크)+RDS(DB).
+
+### 우선순위
+- 반드시: EC2, S3, RDS, VPC, IAM, Security Group, CloudWatch, ELB, Lambda, ECR
+- 자주: DynamoDB, ElastiCache, SQS, CloudFront, Route 53, EKS/ECS, Secrets Manager
+- 알면 좋음: SNS, EventBridge, CloudFormation, Cognito, KMS, Fargate
+
+### 핵심 관점 (도구는 넓게, 개념은 깊게)
+AWS 서비스는 "이름-역할-언제"만 알면 충분. 각각은 핵심 개념의 관리형 구현이라 개념 알면 바로 매핑: ElastiCache="Redis 관리형", EKS="쿠버네티스 관리형", RDS="DB 운영 대행", SQS="메시지 큐". 핵심(네트워크·DB·캐시·큐)이 튼튼하면 서비스는 이름표.
+면접 한 문장: "AWS는 카테고리별 대표 서비스로 이해한다 — 컴퓨팅(EC2/Lambda), 스토리지(S3), DB(RDS/DynamoDB), 네트워킹(VPC/CloudFront/ELB), 권한(IAM), 큐(SQS), 모니터링(CloudWatch). 각각은 핵심 개념의 관리형 구현이라 개념을 알면 빠르게 익힌다."
