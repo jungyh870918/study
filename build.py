@@ -38,6 +38,8 @@ KIND_META = {
     "glossary":           {"label": "용어 체크리스트","desc": "상식 수준 용어 — 한 줄로 설명 가능해야",     "color": "#0d9488"},
     "whiteboard":         {"label": "화이트보드",  "desc": "그려보세요 요청 — ERD·아키텍처·흐름도",       "color": "#7c2d12"},
     "stackdeep":          {"label": "스택 심화",    "desc": "라이브러리 동작 원리·구현 디테일",          "color": "#4338ca"},
+    "dbprisma":           {"label": "Prisma 기본",  "desc": "셋업·스키마·쿼리·트랜잭션",                  "color": "#0e7490"},
+    "serialization":      {"label": "직렬화",      "desc": "서버↔클라 데이터 통신·plain object",        "color": "#0f172a"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -63,7 +65,7 @@ TOPIC_LABEL = {
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary", "whiteboard", "stackdeep"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary", "whiteboard", "stackdeep", "dbprisma", "serialization"]
 
 
 def parse_filename(fn):

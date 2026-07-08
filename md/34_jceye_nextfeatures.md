@@ -252,3 +252,59 @@ export const signInFormSchema = z.object({
 | 적합 | 내부 폼·CRUD | 웹훅·공개 API |
 ★ 선택 기준: 내부 변경=Server Action(편의·타입), 외부가 호출=Route Handler(공개 URL·제어). 이 프로젝트가 토스 confirm=클라가 URL로 부르니 Route Handler, 환불·PayPal=내부 흐름이니 서버 액션으로 가른 이유.
 면접 한 문장: "서버 액션도 내부적으론 자동 생성 엔드포인트로 가는 POST라 본질은 Route Handler와 같은 HTTP 통신이다. 다만 URL이 숨겨져 내부 전용이고, 함수를 직접 import하니 보일러플레이트 없이 타입이 자동 연결된다. 그래서 내부 폼·CRUD는 서버 액션, 웹훅처럼 외부가 부르는 건 Route Handler로 구분한다."
+
+---
+
+## 16. 폴더 아키텍처 — inbound/outbound 레이어 구분 ★
+"외부 API 호출 코드를 어디 두나"에 대한 정리. app/api와 "외부 호출 코드"는 다른 것.
+
+### 폴더별 역할 (실제 구조)
+- app/ — 라우팅 + 조립. 라우트 그룹으로 영역 분리: (root)=쇼핑, (auth)=로그인/회원가입, admin=관리자, user=마이페이지, unauthorized=권한없음. 컴포넌트/카드류는 대부분 components/에, app/은 조립·라우팅 역할.
+- components/ — UI 조각 (admin, payment, shared/product, ui).
+- lib/actions/ — 서버 액션 (Prisma CRUD + 오케스트레이션).
+- app/api/ — 콜백/웹훅 (inbound HTTP 엔드포인트).
+- email/ — React Email 구매 영수증 템플릿(purchase-receipt.tsx).
+- hooks/ — use-toast, use-phone 등 클라 훅.
+- 결제 3중화 — Toss(lib/api/toss + app/api/payments) + Stripe(webhook) + PayPal(lib/paypal.ts) 공존.
+- 그 밑: auth·prisma(neon)·schema·session cart 구조. Zod→types 파생.
+한 줄: app=라우팅+조립, components=UI 조각, lib/actions=서버 액션, app/api=콜백/웹훅.
+
+### ★ 핵심 구분 — inbound vs outbound
+질문: "외부 API 호출 코드는 app/api에 넣나? actions엔 내부 CRUD만?"
+답: app/api와 "외부 API 호출 코드"는 서로 다른 것. 외부 호출을 app/api에 넣는 건 방향이 반대.
+- app/api/ (Route Handler) = inbound: 남이 우리 서버를 호출(웹훅·콜백·업로드). "URL로 노출되는 HTTP 엔드포인트"를 두는 곳.
+- 외부 API 호출 코드 = outbound: 우리가 남(Toss/PayPal)을 호출(fetch 클라이언트·SDK 래퍼). lib/에 둠 (app/api 아님).
+★ Toss 호출하는 confirm-payment.ts를 app/api에 넣으면 필요도 없는 URL이 생기고 아무도 그 URL로 접근 안 하는 이상한 상태가 됨.
+
+### 3층 레이어 (깔끔한 정리)
+```
+app/api/ (route handler)      ← inbound HTTP (웹훅/콜백/업로드)
+lib/actions/ (server action)  ← 오케스트레이션: "주문을 처리한다"
+lib/integrations/ (외부 클라)  ← 저수준: "Toss를 호출한다"
+   + db/prisma                ← 저수준: "DB에 쓴다"
+```
+- lib/integrations/ (=현재 lib/api/) = Toss·PayPal·SMS·uploadthing 외부 서비스 클라이언트. 순수 "외부와 통신"만. 재사용 단위.
+- lib/actions/ = 그 클라이언트들 + Prisma를 조합해 하나의 업무 완성. DB CRUD만 모으는 게 아님.
+
+### ★ "actions엔 CRUD만"은 너무 엄격
+현실의 액션은 CRUD + 외부호출을 엮는 오케스트레이터인 경우가 많음. 예) 결제 확정:
+```
+placeOrder (action)
+├─ prisma로 주문 생성        (CRUD)
+├─ lib/integrations/toss 호출 (외부)
+├─ prisma로 상태 업데이트     (CRUD)
+└─ send-sms 호출             (외부)
+```
+"CRUD만 action"으로 쪼개면 오히려 로직이 흩어짐. 규칙은 이렇게:
+- 외부 호출 "방법"(엔드포인트 URL·헤더·인증·응답 파싱) → lib/integrations/에 격리.
+- 업무 "흐름"(언제 외부를 부르고 그 결과로 DB를 어떻게 바꾸나) → lib/actions/.
+- 외부가 우리를 부르는 진입점(웹훅/콜백) → app/api/, 그 안에서도 실제 로직은 action/integration 호출하고 route는 얇게.
+
+### 이 프로젝트에 적용하면 (리팩터링 방향)
+- lib/api/toss/, paypal.ts, send-sms.ts, uploadthing.ts → lib/integrations/{toss,paypal,sms,uploadthing}/로 모아 "외부 통신"을 폴더명으로 드러내기.
+- encrypt.ts, auth-guard.ts, utils.ts, constants/ → lib/ 유틸/공용 그대로 (외부 API 아니라 내부 유틸이라 섞이는 게 정상).
+- app/api/payments/*, webhooks/stripe → 얇은 route로 유지, 실제 로직은 action/integration 위임.
+정리: 외부 호출 코드는 app/api가 아니라 lib에 격리, app/api는 inbound 전용, actions는 CRUD 전용이 아니라 오케스트레이션.
+
+### 면접 한 문장
+"app/api는 남이 우리를 부르는 inbound 엔드포인트(웹훅·콜백)를 두는 곳이고, 우리가 외부(Toss·PayPal)를 부르는 outbound 코드는 lib/integrations에 격리합니다. 서버 액션은 그 외부 클라이언트와 Prisma를 조합해 하나의 업무를 완성하는 오케스트레이션 계층이라 'CRUD만'이 아니라 CRUD+외부호출을 엮습니다. inbound=app/api, outbound=lib, 흐름=actions로 방향과 역할을 나눕니다."
