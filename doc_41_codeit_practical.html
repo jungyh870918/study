@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>인증·프론트엔드 부가 설명 · 학습 허브</title>
+<title>코드잇 알고리즘 실습 ⑤ 종합 문제(Level 1~3) · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_27_frontend_checkquestions.html">← 인증·프론트엔드 확인 질문</a>
-      <a href="doc_29_domain_practical.html">도메인 설계 사례 →</a>
+      <a href="doc_40_codeit_practical.html">← 코드잇 알고리즘 실습 ④ Greedy</a>
+      <a href="doc_00b_glossary.html">상식 수준 용어 체크리스트 →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,79 +63,150 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서28] 인증·프론트엔드 부가 설명 — 난이도 있는 개념 보충
+# [문서41] 코드잇 알고리즘 실습 ⑤ 종합 문제(Level 1~3) — 구현 손코딩
+> 패러다임을 스스로 골라 푸는 종합 실습. Kadane·비둘기집 원리 등 면접 단골이 섞여 있음.
 
 ---
 
-## ① HttpOnly 쿠키 & CSRF (자세히)
-HttpOnly: 쿠키에 HttpOnly 플래그→JS가 못 읽음(document.cookie 불가). 브라우저가 서버 요청 시만 자동 전송. XSS로 악성 JS 주입돼도 탈취 불가.
-왜 CSRF 취약: 쿠키 "자동 전송"이 양날. 브라우저는 해당 도메인 모든 요청에 쿠키 자동 첨부(요청 출처 안 따짐).
-CSRF 시나리오:
-1) bank.com 로그인(HttpOnly 쿠키에 토큰)
-2) 로그아웃 안 하고 evil.com 방문
-3) evil.com에 숨은 <form action=bank.com/transfer POST> 또는 <img src=...>
-4) 브라우저가 bank.com 요청에 인증 쿠키 자동 첨부!
-5) 서버는 정상 요청으로 착각→이체
-핵심: 공격자가 토큰 훔치는 게 아니라 "브라우저가 쿠키를 붙여주는 걸 악용". HttpOnly로 못 막음(읽는 게 아니니).
-방어1 SameSite:
-- Strict: 다른 사이트 요청엔 쿠키 안 붙임. 가장 안전, 외부 링크 진입 시 로그인 풀림(UX).
-- Lax: 안전한 이동(링크/GET)엔 붙임, POST/이미지/iframe 위조엔 안 붙임. 실무 기본.
-- None: 항상 붙임(크로스 사이트), Secure 필수.
-방어2 CSRF 토큰:
-1) 서버가 예측 불가 랜덤 토큰 발급
-2) 클라가 요청 시 헤더/body에 담아 전송
-3) 서버가 "세션+CSRF 토큰" 짝 검증
-evil.com은 이 랜덤 토큰 모름(같은 출처 아니라 못 읽음)→위조 불가. 상태 변경(POST/PUT/DELETE)에 적용.
-정리: SameSite=Lax 기본+중요 변경엔 CSRF 토큰. HttpOnly(XSS)+SameSite+CSRF 토큰(CSRF)=삼중 방어.
+## 1. [Lv1] 빠르게 산 오르기 (Greedy)
 
-## ② 액세스 토큰 vs 리프레시 토큰 (존재 이유=자동 로그인)
-딜레마: 수명 짧으면 안전하나 자주 로그인(불편), 길면 편하나 탈취 시 오래 악용(위험).
-해결(두 토큰):
-- 액세스: 짧음(15분~1h), 매 요청 첨부, 메모리 저장, 노출 큼.
-- 리프레시: 김(수일~수주), 액세스 갱신용, HttpOnly 쿠키, 노출 적음.
-흐름(자동 로그인 실체):
-1) 로그인→액세스(15분)+리프레시(2주) 발급
-2) API마다 액세스 첨부
-3) 15분 후 만료→401
-4) 클라가 리프레시로 "새 액세스 주세요"
-5) 서버 검증→새 액세스 발급
-6) 사용자는 모름→끊김 없이 사용(=자동 로그인)
-인과: 액세스 탈취돼도 15분이면 만료(피해 최소)+리프레시는 HttpOnly라 탈취 어렵고 갱신 때만 노출. "2주 유지"(편의)+"탈취 피해 최소"(보안) 동시 달성.
-★ 리프레시 회전(rotation): 갱신마다 리프레시도 새로 발급+기존 폐기. 탈취된 것 재사용 시 감지해 세션 차단.
+문제: 약수터 위치 `water_stops`와 용량 `capacity`(km). 물 안 떨어지게 최소 약수터만 들르기.
 
-## ③ React Query "서버 상태"의 서버 = 백엔드 API (헷갈림 해소)
-- 서버 상태: 원본이 백엔드(API/DB)에 있는 데이터. 프론트는 fetch해 사본(캐시)만 들고 있음.
-- 클라이언트 상태: 프론트에만 존재(모달/폼 값/다크모드).
-- ★ React Query의 "서버" = 당신의 백엔드 API 서버(NestJS/Express). Next 서버 컴포넌트나 리액트 서버가 아님.
-Next와 관계:
-- Next 서버 컴포넌트: Next 서버에서 렌더링 시 데이터 미리 fetch(위치=렌더링).
-- React Query: 브라우저에서 백엔드 API fetch·캐싱(개념=데이터 원본).
-- 다른 층. 초기 데이터는 서버 컴포넌트, 이후 인터랙션은 React Query로 함께 씀.
+```python
+def select_stops(water_stops, capacity):
+    stop_list = []
+    prev_stop = 0
+    for i in range(len(water_stops)):
+        if water_stops[i] - prev_stop > capacity:   # 못 가면 직전에서 채움
+            stop_list.append(water_stops[i - 1])
+            prev_stop = water_stops[i - 1]
+    stop_list.append(water_stops[-1])               # 마지막은 반드시
+    return stop_list
 
-## ④ DTO & ValidationPipe (NestJS)
-DTO: 계층 간 데이터 형태 정의 객체. "이 요청/응답은 이런 필드"의 계약.
-  class CreateUserDto { @IsEmail() email; @IsString() @MinLength(8) password; @IsOptional() @IsInt() age?; }
-왜: 명확한 계약(타입 명시)+유효성 기준(데코레이터)+엔티티와 분리(내부 필드 숨김).
-ValidationPipe: 컨트롤러 도달 전 입력 변환·검증. DTO 규칙과 대조.
-  app.useGlobalPipes(new ValidationPipe({ whitelist:true(없는 필드 제거), forbidNonWhitelisted:true(없는 필드 에러), transform:true(타입 변환) }))
-- 위반이면 자동 400(컨트롤러 도달 전)→컨트롤러는 검증된 데이터만 받음. 검증 로직을 컨트롤러에서 분리.
+print(select_stops([1, 4, 5, 7, 11, 12, 13, 16, 18, 20, 22, 24, 26], 4))
+# [4, 7, 11, 13, 16, 20, 24, 26]
+```
 
-## ⑤ NestJS 요청 한 바퀴 (전체 흐름) ★
-[클라 요청]
-① Middleware: 가장 먼저. 로깅/CORS/body 파싱/토큰 추출. Express 레벨.
-② Guards: 인증·인가("접근 권한 있나?"). JWT 검증/역할. 실패 403/401.
-③ Interceptors(before): 요청 가로채 부가 처리(로깅/타이머 시작).
-④ Pipes: 입력 변환·검증(ValidationPipe가 DTO로). 위반이면 400.
-⑤ Controller: 라우트 핸들러, Service 호출.
-⑥ Service: 비즈니스 로직(DI 주입).
-⑦ Repository: DB 접근(TypeORM/Prisma), 쿼리 실행.
-[DB] 읽기/쓰기
-→ 역방향 ⑦→⑥→⑤ 반환
-③ Interceptors(after): 응답 가로채 변형(포맷 통일/로깅 완료/시간 측정).
-② Exception Filters: 에러 잡아 응답 포맷팅.
-[클라 응답]
-★ 인터셉터 vs 미들웨어: 미들웨어=컨트롤러 전에만, Express 레벨. 인터셉터=요청 전+응답 후 양쪽, Nest 레벨(응답 변형 가능, 포맷 통일 {data:...}이 대표 용도).
-한문장: "미들웨어(전처리)→가드(인증/인가)→인터셉터(전처리)→파이프(DTO 검증)→컨트롤러→서비스(로직)→레포지토리(DB), 응답은 인터셉터(후처리)로, 에러는 예외 필터가 잡음."
+## 2. [Lv2] 투자 귀재 규식이 (Kadane's Algorithm)
+
+문제: 일별 수익 리스트에서 **연속 구간 최대합**.
+
+```python
+def sublist_max(profits):
+    max_profit_so_far = profits[0]   # 지금까지 전체 최대
+    max_check = profits[0]           # 현재 요소로 끝나는 최대 구간합
+    for i in range(1, len(profits)):
+        max_check = max(max_check + profits[i], profits[i])
+        max_profit_so_far = max(max_profit_so_far, max_check)
+    return max_profit_so_far
+
+print(sublist_max([7, -3, 4, -8]))                      # 8
+print(sublist_max([-2, -3, 4, -1, -2, 1, 5, -3]))       # 7
+```
+
+포인트: O(n). Brute Force O(n²)·분할정복 O(n log n)보다 우수. "이어붙일지 새로 시작할지"를 매 요소마다 결정하는 게 Kadane의 핵심.
+
+## 3. [Lv2] 삼송전자 주식 분석 (One-pass)
+
+문제: 한 번 사고 한 번 팔 때 최대 수익. (사는 날 팔 수는 없음)
+
+```python
+def max_profit(stock_prices):
+    max_profit_so_far = stock_prices[1] - stock_prices[0]
+    min_price_so_far = min(stock_prices[0], stock_prices[1])
+    for i in range(2, len(stock_prices)):
+        max_profit_so_far = max(max_profit_so_far, stock_prices[i] - min_price_so_far)
+        min_price_so_far = min(min_price_so_far, stock_prices[i])
+    return max_profit_so_far
+
+print(max_profit([7, 1, 5, 3, 6, 4]))  # 5
+print(max_profit([7, 6, 4, 3, 1]))     # -1  (계속 하락 → 최소 손실)
+```
+
+포인트: "지금까지의 최저 매수가"만 들고 한 번 순회 → O(n).
+
+## 4. [Lv2] 출근하는 방법 (계단 오르기 = 피보나치)
+
+문제: 1칸 또는 2칸씩 올라 n계단 오르는 경우의 수.
+
+```python
+def staircase(n):
+    a, b = 1, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a
+
+print(staircase(6))   # 13
+print(staircase(25))  # 121393
+```
+
+포인트: 경우의 수가 피보나치와 동일 → O(n). "n번째 = (n-1)번째 + (n-2)번째"임을 알아채는 게 관건.
+
+## 5. [Lv3] 강남역 폭우 II (빗물 O(n) 최적화)
+
+문제: 문서38의 빗물 채우기를 O(n)으로. 왼쪽/오른쪽 최고 높이를 미리 배열에 저장.
+
+```python
+def trapping_rain(buildings):
+    n = len(buildings)
+    if n == 0:
+        return 0
+    left_list = [0] * n
+    left_list[0] = buildings[0]
+    for i in range(1, n):
+        left_list[i] = max(left_list[i - 1], buildings[i])
+
+    right_list = [0] * n
+    right_list[-1] = buildings[-1]
+    for i in range(n - 2, -1, -1):
+        right_list[i] = max(right_list[i + 1], buildings[i])
+
+    total_height = 0
+    for i in range(n):
+        upper_bound = min(left_list[i], right_list[i])
+        total_height += max(0, upper_bound - buildings[i])
+    return total_height
+
+print(trapping_rain([0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]))  # 6
+```
+
+포인트: 매 칸 `max()` 재계산(O(n²)) → 전처리 배열로 O(n). 공간 O(n)을 쓰고 시간을 얻는 전형적 트레이드오프.
+
+## 6. [Lv3] 중복되는 항목 찾기 I (정렬)
+
+문제: 길이 N+1 리스트에 1~N이 들어 있어 하나는 중복. 중복 수 찾기.
+
+```python
+def find_same_number(some_list):
+    some_list.sort()
+    for i in range(len(some_list) - 1):
+        if some_list[i] == some_list[i + 1]:   # 정렬하면 중복은 인접
+            return some_list[i]
+
+print(find_same_number([1, 4, 3, 5, 3, 2]))  # 3
+```
+
+## 7. [Lv3] 중복되는 항목 찾기 II (이진 탐색 + 비둘기집 원리)
+
+제약: 추가 공간 O(1), 원본 리스트 변형 금지.
+
+```python
+def find_same_number(some_list):
+    low, high = 1, len(some_list) - 1
+    while low < high:
+        mid = (low + high) // 2
+        count = sum(1 for num in some_list if low <= num <= mid)
+        if count > mid - low + 1:   # 범위 크기보다 원소가 많으면 중복은 이쪽
+            high = mid
+        else:
+            low = mid + 1
+    return low
+
+print(find_same_number([1, 4, 3, 5, 3, 2]))              # 3
+print(find_same_number([5, 2, 3, 4, 1, 6, 7, 8, 9, 3]))  # 3
+```
+
+포인트: **값의 범위**를 이진 탐색. "범위에 속한 개수 > 범위 크기면 그 안에 중복이 있다"(비둘기집 원리). 시간 O(n log n), 공간 O(1) — 사전을 못 쓸 때의 정석.
 
 </script>
 

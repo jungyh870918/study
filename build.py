@@ -49,6 +49,7 @@ TOPIC_LABEL = {
     "devops": "CI/CD·쿠버네티스",
     "frontend": "인증·프론트엔드",
     "domain": "도메인 설계 사례",
+    "codeit": "코드잇 알고리즘 실습",
     "ds": "자료구조·알고리즘",
     "os": "운영체제",
     "voyage": "프로젝트: Voyage",
