@@ -23,10 +23,20 @@ Handlebars = 서버 사이드(또는 빌드 타임) HTML 템플릿 엔진. React
 - 조건: {{#if isActive}} ... {{else}} ... {{/if}}
 - 부분 템플릿(partial): {{> header}}  (헤더 조각 재사용, 레이아웃 공통화)
 - 헬퍼(helper): {{formatDate date}}  (커스텀 함수 등록해 값 변환)
-동작 방식: 서버가 데이터 + 템플릿(.hbs)을 합쳐 완성된 HTML 문자열을 생성해 브라우저로 전송. (Express + express-handlebars 조합이 흔했음)
+동작 방식(두 형태):
+- 서버 사이드: 서버가 데이터 + 템플릿(.hbs)을 합쳐 완성 HTML을 생성해 전송. (Express+express-handlebars, 또는 Java의 Handlebars.java/Mustache)
+- ★ 클라이언트 사이드(script 태그 방식): HTML 템플릿을 <script type="text/x-handlebars-template">에 담아둠. 브라우저는 모르는 타입이라 실행/렌더 안 하고 텍스트로 보관 → JS가 document.getElementById().innerHTML로 꺼내 Handlebars.compile()로 컴파일 → 데이터 주입 → innerHTML로 DOM 삽입. 여러 조각을 script 블록/partial로 나눠 조립.
+  왜 script 태그? <div>면 브라우저가 바로 렌더해 {{name}}이 그대로 보임. script의 특수 type이면 브라우저가 안 건드려 템플릿 원본을 그대로 보관·추출 가능.
+  ★ 실제 사례: 대선 출구조사 차트 프로젝트가 이 방식(Java 백엔드 + script 태그 Handlebars 템플릿, 문서29-D).
 ★ React와 대비: Handlebars=서버가 HTML을 미리 조립해 보냄(전통적 SSR, 상호작용은 별도 JS). React=클라이언트가 상태로 UI를 그림(컴포넌트+가상DOM). Handlebars는 "템플릿에 값을 꽂아 문자열 HTML 생성", React는 "상태가 바뀌면 다시 렌더".
 - 이 방식 스타일: 보통 전역 CSS/SCSS + 클래스명으로. 컴포넌트 스코프 개념이 약해 BEM 같은 네이밍 규칙으로 충돌 관리.
-★ 경험 서술: "예전 프로젝트는 Handlebars 템플릿에 SCSS로 스타일링하는 전통적 서버 렌더 방식이었습니다. 서버가 데이터를 템플릿에 꽂아 HTML을 만들어 보냈고, 스타일은 전역 SCSS에 클래스로 정의했습니다. 지금의 React 컴포넌트+Tailwind와는 접근이 달랐죠."
+### 관련: Thymeleaf (Spring 서버 템플릿) — 다른 프로젝트
+- Thymeleaf = Spring에서 흔한 서버 사이드 템플릿 엔진. Handlebars의 {{}}와 달리 HTML 속성 방식: th:text(값), th:each(반복), th:if(조건), th:href 등.
+- natural template: th: 속성은 순수 HTML로도 열림(브라우저에서 그냥 열어도 안 깨짐). 서버가 데이터를 채운 완성 HTML을 전송(서버 렌더).
+- ★ 실제 사례: 행안부 SSO 프로젝트가 Spring + Thymeleaf + Nexacro(엔터프라이즈 UI 플랫폼) 조합(문서29-E).
+- Handlebars(script 태그, 클라 렌더) vs Thymeleaf(th: 속성, 서버 렌더) — 둘 다 템플릿이지만 렌더 위치·문법이 다름.
+
+★ 경험 서술: "정부 SSO는 Spring+Thymeleaf에 Nexacro를 얹은 엔터프라이즈 스택이었고, 출구조사 차트는 Java 백엔드 + Handlebars script 템플릿(클라 렌더)이었습니다. 둘 다 React 이전 세대의 서버 중심 스택으로, 지금의 컴포넌트+Tailwind와는 접근이 달랐습니다. 모던 SPA뿐 아니라 엔터프라이즈/레거시 환경도 다뤄봤습니다."
 
 ## 3. Tailwind 전역 커스텀 — 기본 설정
 Tailwind는 프레임워크 기본값을 그대로 쓰지 않고 브랜드에 맞게 커스텀(design token). v3와 v4가 방식이 다름.
