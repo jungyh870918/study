@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CI/CD·쿠버네티스 부가 설명 · 학습 허브</title>
+<title>상식 수준 용어 체크리스트 · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_21_devops_basic.html">← CI/CD·쿠버네티스 기본</a>
-      <a href="doc_23_devops_essentials.html">CI/CD·쿠버네티스 완전 기초 →</a>
+      <a href="doc_36_authsrv_authimpl.html">← 프로젝트: 인증 서버</a>
+      <span></span>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,63 +63,60 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서22] CI/CD·쿠버네티스 부가 설명 — 난이도 있는 개념 보충
+# [문서] 상식 수준 용어 체크리스트 — 한 줄로 설명 가능해야
+> 경력직이면 "이 정도는 당연히" 나오는 기본 용어. 깊이 파는 게 아니라 들었을 때 바로 반응+한 줄 설명.
+> 기준: 각 용어를 한 문장으로 설명할 수 있는가? 막히면 그 개념부터 복습.
 
 ---
 
-## ① K8s는 어떻게 "원하는 상태"를 유지하나 (Reconciliation Loop)
-- 선언적: "Pod 3개 원함"을 선언 → 컨트롤러가 실제와 비교 → 다르면 조치(하나 죽으면 생성).
-- etcd: 클러스터의 모든 상태를 저장하는 키-값 저장소(진실의 원천).
-- 컨트롤 플레인: API Server(관문)+Scheduler(Pod를 노드에 배치)+Controller Manager(reconcile)+etcd.
-- 워커 노드: kubelet(Pod 실행)+kube-proxy(네트워킹)+컨테이너 런타임.
+## 🌐 네트워크
+프로토콜·계층: TCP/UDP, IP, HTTP/HTTPS, HTTP/2·3, TLS/SSL, DNS, OSI 7계층, TCP/IP 4계층
+TCP 동작: 3-way/4-way handshake, TIME_WAIT, 흐름 제어, 혼잡 제어, MTU/MSS
+HTTP: 메서드(GET/POST/PUT/PATCH/DELETE), 상태코드(2xx/3xx/4xx/5xx), 헤더, 쿠키/세션, 멱등성, REST, stateless
+보안·주소: CORS, CSRF, XSS, 방화벽, 포트, 공인/사설 IP, NAT, 프록시(포워드/리버스), 로드밸런서
+응용: WebSocket, gRPC, GraphQL, CDN, VPN, ARP, 소켓
+한 줄 테스트:
+- TIME_WAIT → 연결 종료 후 잔여 패킷 처리 위해 잠깐 대기하는 상태.
+- 멱등성 → 같은 요청 여러 번 보내도 결과 같음(GET/PUT 멱등, POST 아님).
+- CORS → 다른 출처(프로토콜+도메인+포트) 요청을 브라우저가 막는 정책.
+- 3-way handshake → SYN→SYN/ACK→ACK로 연결 수립.
+- REST → 자원을 URL로, 행위를 HTTP 메서드로 표현하는 stateless API 스타일.
 
-## ② EKS에서 AWS가 관리하는 것 vs 내가 하는 것
-- AWS 관리: 컨트롤 플레인(API Server, etcd, Scheduler) — 이중화·업그레이드.
-- 내 몫: 워커 노드(EC2/Fargate), 앱 배포, 네트워킹 설정, 오토스케일 구성.
-- Fargate: 노드 관리도 서버리스로 위임(노드 신경 안 씀). vs 관리형 노드그룹(EC2 직접).
+## 🗄️ 데이터베이스
+인덱스·쿼리: 인덱스, B+Tree, 클러스터드/논클러스터드, 복합 인덱스, 커버링 인덱스, 카디널리티, 풀스캔, EXPLAIN(실행계획), 옵티마이저
+트랜잭션: 트랜잭션, ACID, 커밋/롤백, 격리 수준(4종), 락(공유/배타), 데드락, MVCC, 낙관적/비관적 락
+설계: 정규화(1~3NF), 반정규화, PK/FK, 참조 무결성, 스키마, 관계(1:1/1:N/N:N)
+조인·기법: INNER/LEFT/RIGHT/OUTER JOIN, 서브쿼리, CTE(WITH), GROUP BY, HAVING, 집계함수, UNION, 손익분기점
+운영·확장: 복제, 샤딩, 파티셔닝, 커넥션 풀, N+1, 슬로우 쿼리, WAL, 백업/복구
+SQL vs NoSQL: 관계형/문서형/키-값, ACID vs BASE, 최종/강한 일관성
+한 줄 테스트:
+- 카디널리티 → 컬럼 값의 다양성. 높을수록 인덱스 효과 큼.
+- N+1 → 목록 1번+각 행 연관 조회 N번으로 쿼리 폭증.
+- MVCC → 락 대신 버전 스냅샷으로 읽기·쓰기 동시성 확보.
+- 정규화 → 중복 제거 위해 테이블 나누고 FK로 연결.
+- 샤딩 → 데이터를 여러 DB에 수평 분할(쓰기 확장).
+- 커버링 인덱스 → 쿼리에 필요한 컬럼이 인덱스에 다 있어 테이블 안 봐도 됨.
 
-## ③ IRSA (IAM Roles for Service Accounts)
-- Pod가 AWS 서비스(S3 등) 접근 시 키 대신 IAM Role을 ServiceAccount에 연결.
-- OIDC 페더레이션으로 Pod에 임시 자격증명 자동 주입(EC2 Instance Profile의 Pod 버전).
-- 키 하드코딩 없이 최소 권한. (AWS편 IAM Role 원리와 동일)
+## 🧮 알고리즘·자료구조
+복잡도: 시간/공간 복잡도, Big-O, 최악/평균/최선, O(1)/O(log n)/O(n)/O(n log n)/O(n²)/O(2ⁿ)
+자료구조: 배열, 연결 리스트, 스택(LIFO), 큐(FIFO), 덱, 해시테이블, 트리, BST, 힙, 그래프, 트라이
+정렬·탐색: 버블/선택/삽입, 퀵, 병합, 힙 정렬, 안정 정렬, 이진 탐색, 선형 탐색
+기법: 재귀, 분할 정복, DP, 그리디, 백트래킹, 완전 탐색, 투 포인터, 슬라이딩 윈도우, 메모이제이션
+그래프: DFS, BFS, 다익스트라, 최단 경로, MST, 위상 정렬, Union-Find
+해시·기타: 해시 함수, 해시 충돌, in-place, 재귀 vs 반복
+한 줄 테스트:
+- 스택 vs 큐 → 스택 LIFO(후입선출), 큐 FIFO(선입선출).
+- DP → 겹치는 부분 문제를 저장해 재계산 없이 푸는 것.
+- 이진 탐색 → 정렬된 배열을 반씩 줄여 O(log n)으로 찾기.
+- 해시 충돌 → 다른 키가 같은 해시값. 체이닝/개방주소법으로 해결.
+- DFS vs BFS → 깊이 우선(스택/재귀) vs 너비 우선(큐, 최단거리).
+- 안정 정렬 → 같은 값의 원래 순서 유지(병합 O, 퀵 X).
+- 그리디 → 매 순간 최선 선택. 항상 최적은 아님(반례 확인 필요).
 
-## ④ Terraform state 심화
-- state = 코드와 실제 인프라의 매핑. 없으면 Terraform이 뭘 만들었는지 모름.
-- 원격 백엔드(S3)+잠금(DynamoDB): 팀이 동시에 apply해도 충돌 방지.
-- terraform import: 콘솔로 만든 기존 리소스를 코드 관리로 편입.
-- 민감정보: state에 평문 저장될 수 있어 암호화·접근 제한 필수.
-
-## ⑤ 헬름(Helm) & Kustomize
-- Helm: K8s 매니페스트의 패키지 매니저. 템플릿+values로 환경별 설정 주입. 차트로 재사용.
-- Kustomize: 베이스 매니페스트에 환경별 오버레이(패치). 템플릿 없이 순수 YAML.
-- 선택: 복잡한 파라미터화=Helm, 단순 환경 차이=Kustomize.
-
-## ⑥ 시크릿 관리 (GitOps의 난제)
-- Git에 평문 시크릿 금지. 해결:
-  - Sealed Secrets: 암호화해 Git에 저장, 클러스터에서만 복호화.
-  - External Secrets Operator: AWS Secrets Manager에서 실시간 주입.
-  - SOPS: 파일 단위 암호화.
-- ★ GitOps에서 "모든 걸 Git에"와 "시크릿은 Git에 넣으면 안 됨"의 충돌을 이렇게 푼다.
-
-## ⑦ 배포 전략 상세
-- 롤링: maxSurge(추가 생성 수)/maxUnavailable(동시 중단 수)로 속도·안정 조절.
-- 카나리: 트래픽 가중치를 서비스 메시(Istio)나 인그레스로 조절. 메트릭 보고 자동 승격/롤백(Argo Rollouts, Flagger).
-- 블루-그린: 트래픽 스위치가 순간이라 롤백 즉시. 단 두 배 리소스 필요.
-
-## ⑧ 파이프라인 보안 (DevSecOps)
-- SAST(SonarQube): 코드 정적 분석.
-- SCA(Snyk): 의존성 취약점.
-- 이미지 스캔(Trivy): 컨테이너 취약점.
-- IaC 스캔(tfsec/Checkov): Terraform 보안.
-- 이미지 서명(cosign): 공급망 무결성.
-- OPA/Gatekeeper: 클러스터 정책 강제(예: 권한 있는 컨테이너 금지).
-- ★ 각 단계가 게이트: 심각 취약점이면 파이프라인 중단.
-
-## ⑨ 관측성 (운영)
-- 로그: EKS→CloudWatch/Loki. 요청 ID로 추적.
-- 메트릭: Prometheus+Grafana. HPA도 이 메트릭 기반.
-- 트레이싱: 분산 추적(Jaeger).
-- ★ Pod가 죽고 사는 환경이라 개별 서버가 아닌 집계·라벨 기반 관측 필수.
+## 활용법
+- 각 용어를 한 줄로 설명해보고, 막히면 해당 분야 문서로.
+- 면접에서 이 용어들은 "설명"이 아니라 "반응" 대상 — 나오면 즉시 알아듣고 한 줄로 받아치기.
+- 깊이는 후속 질문에서. 여기 있는 건 "당연히 아는" 바닥 상식선.
 
 </script>
 

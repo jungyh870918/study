@@ -35,6 +35,7 @@ KIND_META = {
     "nextfeatures":       {"label": "Next.js 활용", "desc": "App Router 기능별 실제 구현 정리",             "color": "#0f172a"},
     "sqlmastery":         {"label": "SQL 실전 범위","desc": "실제 프로젝트 쿼리로 본 다뤄본 범위",           "color": "#155e75"},
     "authimpl":           {"label": "인증 구현",    "desc": "JWT·리프레시 로테이션·OAuth·가드 실제 코드",  "color": "#be123c"},
+    "glossary":           {"label": "용어 체크리스트","desc": "상식 수준 용어 — 한 줄로 설명 가능해야",     "color": "#0d9488"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -57,7 +58,7 @@ TOPIC_LABEL = {
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary"]
 
 
 def parse_filename(fn):
