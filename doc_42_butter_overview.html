@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>네트워크 기본 · 학습 허브</title>
+<title>프로젝트 Butter · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_00b_glossary.html">← 상식 수준 용어 체크리스트</a>
-      <a href="doc_2_network_supplement.html">네트워크 부가 설명 →</a>
+      <a href="doc_45_dsimpl_practical.html">← 자료구조 구현 ④ 그래프 · DFS · BFS</a>
+      <span></span>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,143 +63,181 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서1] 네트워크 기본 — 면접 실전용
-> 포맷: 용어 정의 → 핵심 개념(한두 줄) → 문제 정의/인과관계
-> 첫 질문엔 정의/핵심만, 후속 질문에서 디테일 확장.
+# [문서42] 프로젝트 Butter — 설명 자료 (개요)
+> "무엇을 만들었나"보다 "왜 그렇게 설계했나 / 어떤 문제를 어떻게 풀었나".
+> 면접관이 좋아하는 건 기능 나열이 아니라 판단의 근거. 각 항목 "문제→선택→이유→결과".
 
 ---
 
-## 1. 계층 모델
-정의: OSI 7=관심사 분리 참조모델, 실무는 TCP/IP 4계층. 실전 가치 = "장애가 몇 층인지 끊는 진단 축".
-인과: L2=같은 네트워크(MAC, 홉마다 바뀜), L3=다른 네트워크(IP, 종단 유지) → 라우팅 성립.
-후속: 캡슐화(Segment→Packet→Frame) / 진단축 L3=ping·라우팅, L4=포트·방화벽, L7=앱로그 / 앵커 L2=MAC, L3=IP, L4=TCP
+## 1. 한 문장 소개
+Butter = 읽은 책을 잊지 않기 위한 독서 저널 & 아카이브 플랫폼. "읽은 것을 기억하는 공간."
+- 책을 선택하면 GPT가 자동으로 맥락·인용·배경을 enrich하고, 6단계 가이드 질문으로 감상을 기록.
+- 기록된 감상은 감정 지도·워드 클라우드·아크 다이어그램 등 5종 시각화로 독서 패턴을 탐색.
+- AI가 누적 저널을 분석해 다음 책에 맞는 개인화된 질문을 생성.
 
----
+엘리베이터 피치(30초):
+"책을 읽은 경험은 대부분 사라진다. Butter는 독서 경험을 6단계 인터뷰 구조로 잡고,
+GPT로 개인화된 질문을 던져 '이 책이 나에게 무엇이었나'를 기억 가능한 형태로 아카이브하는 앱.
+감상이 쌓일수록 개인화 품질이 올라가는 플라이휠 구조."
 
-## 2. TCP 핸드셰이크 & 상태
-정의: 3-way = 양쪽 송신·수신 능력 상호확인. 4-way = 전이중이라 방향별 독립 종료.
-문제/해결:
-- TIME_WAIT = 능동 종료자(먼저 끊은 쪽) 2×MSL 대기. 폭증 → 포트 고갈 → keep-alive/커넥션 풀.
-- CLOSE_WAIT = 상대 FIN 받고 내 앱이 close() 안 함. 폭증 → 애플리케이션 버그.
-대비: TIME_WAIT는 커널이 정리, CLOSE_WAIT는 앱이 안 닫으면 영구 잔존.
-후속: 왜 3번(2=수신능력 확인불가, 4=SYN+ACK 합쳐 불필요) / ISN 랜덤 / SYN Flood→SYN Cookie
+## 2. 기술 스택 (왜 골랐나까지)
+- **프론트 React + TypeScript + Tailwind CSS v4 + Vite**: 타입 안전성, Tailwind의 CSS 변수 연동으로 6개 테마 토큰 관리.
+- **라우터 React Router v6**, **애니메이션 Framer Motion**: 페이지 전환, 패널 진입 모션.
+- **백엔드 Express + TypeScript + Prisma ORM**: Node 생태계 통일(GPT SDK, 카카오/Google Books API). Prisma로 스키마 타입 자동 생성, 마이그레이션 추적.
+- **DB PostgreSQL (Neon)**: Serverless PostgreSQL. Railway 배포와 분리해 DB 레이어 독립. `DATABASE_URL` + `DIRECT_URL` 이중 연결로 커넥션 풀 분리.
+- **OpenAI GPT-4o-mini**: 책 enrich(quote·historicalContext), 유저 프로파일 추출, 개인화 질문 생성. mini 모델을 쓴 이유 — latency와 비용. 깊은 추론보다 구조적 JSON 출력이 목적이라 mini로 충분.
+- **카카오 도서 API + Google Books API**: 카카오 1순위(한국어 도서 메타 품질), Google Books 2순위(영어권). 백엔드 프록시를 통해 API 키 노출 방지 + enrichment 병합.
+- **배포 Vercel(프론트) + Railway(백엔드)**: 프론트는 정적 빌드라 Vercel 자동 배포. 백엔드는 Railway git push → 즉시 반영.
+- **인증**: JWT — 로그인 응답에 token body 포함 + localStorage + `Authorization: Bearer` 헤더. 쿠키 방식은 Vercel↔Railway 크로스 도메인에서 sameSite 이슈(→7번).
 
----
+## 3. 아키텍처 — 핵심 데이터 흐름
+```
+책 탐색:   프론트 → /api/books (카카오 프록시) → /api/books/:id/enrich (GPT)
+저널 작성: 6단계 PROMPTS → answers 맵 → GPT → JournalEntry (content: "[시작]\n...[느낌]\n...")
+개인화:   JournalEntry 누적 → /api/insights/profile (GPT extractProfile → UserProfile 저장)
+           → /api/insights/questions (GPT generateQuestions, UserProfile 참조)
+시각화:   JournalEntry[] → 프론트 d3.js 처리 (서버 계산 없음, 전부 클라이언트)
+인증:     POST /api/auth/login → { token, user } → localStorage → Authorization: Bearer
+```
+강조할 설계 결정:
+- **Book soft link (FK 없음)**: JournalEntry에 bookId/bookTitle/bookAuthor/bookCover를 스냅샷으로 비정규화 저장. 외부 API(카카오/Google Books) 데이터는 영속 보장이 없어서, 삭제·변경돼도 저널이 깨지지 않음.
+- **시각화는 클라이언트 전담**: d3.js 계산을 서버가 아닌 프론트에서. 이유 — 시각화 파라미터(정렬·필터)가 인터랙션마다 바뀌고, 저널 데이터는 이미 앱에 로드된 상태라 추가 왕복 불필요.
+- **UserProfile upsert**: GPT 결과를 DB에 저장(`@@unique userId`)해 매 요청마다 GPT 재호출하지 않음. `promptVersion` 필드로 프롬프트 교체 시 재생성 트리거 추적.
 
-## 3. 흐름제어 vs 혼잡제어
-정의: 흐름제어 = 수신자 버퍼 배려(rwnd). 혼잡제어 = 네트워크 경로 배려(cwnd). 송신량 = min(rwnd, cwnd).
-문제/해결:
-- Zero Window = 수신 버퍼 꽉 참 → 송신 정지. TCP의 backpressure.
-- 처리량 < 대역폭 → BDP(=대역폭×RTT)만큼 window 미확보. Window Scaling 확인.
-후속: Slow Start(지수)→Congestion Avoidance(선형) AIMD 톱니 / CUBIC(손실기반) vs BBR(대역폭기반) / 누적 ACK→3 dup ACK→Fast Retransmit, SACK / HOL Blocking→HTTP/3(QUIC)
+## 4. 디자인 레퍼런스 확정 — Stitch 활용
+문제: "세련된 독서 앱"이라는 비전이 있지만 구체적 방향성 없이 코딩하면 UI 결정 하나하나가 흔들림.
+해결 — Stitch(AI 디자인 레퍼런스 도구)로 레퍼런스 수집 후 방향 고정:
 
----
+먼저 "THE ARCHIVIST", "Botanical Archive", "Oceanic", "Brutalist", "Blueprint", "Emerald Editorial" 6가지 아카이브 무드를 레퍼런스로 확정. 각 무드를 Butter의 테마로 1:1 매핑(Classic/Botanical/Oceanic/Brutalist/Blueprint/Emerald). CSS 변수 8종 토큰(`--color-butter-bg`, `--color-butter-text`, `--color-butter-primary` 등)을 테마별로 정의하고 `useTheme` 훅 하나로 런타임 교체.
 
-## 4. MTU/MSS · 지연 범인
-정의: MTU = L2 프레임 페이로드 최대(1500). MSS = TCP 데이터 최대(MTU−40=1460), 3-way 때 광고.
-증상 → 범인:
-- VPN 켜면 특정 사이트 불가 → 터널 헤더로 MTU 초과 → MSS Clamping
-- 큰 응답만 멈춤 → PMTUD 블랙홀(ICMP 차단) → ICMP 허용
-- 작은 요청 40ms 밀림 → Nagle × Delayed ACK → TCP_NODELAY
-- 대역폭 OK인데 지연 널뜀 → Bufferbloat → AQM(FQ-CoDel)
+세부 교정 과정:
+- 레퍼런스에서 **"대형 타이포그래피 + 메타 정보 우측 배치"** 패턴을 확인 → 모든 페이지 헤더를 `clamp(2.6rem, 6vw, 4.5rem)` 대형 제목 + `REF. XXX-YYY` 코드 우측 배치로 통일.
+- "잡지 편집 레이아웃" 레퍼런스 → 감정 지도의 "잡지" 탭 구현 (10종 카드 스펙 시퀀스, 각기 다른 너비와 표지 배치로 flex-wrap 자연 배치).
+- 카드 간격·border 수 최소화, `borderRadius` 제거(직각 카드)로 아카이브/편집물 느낌 적용.
 
----
+★ 인사이트: "디자인 방향을 레퍼런스로 먼저 고정하면 이후 모든 컴포넌트 결정의 기준이 생긴다. 결정 피로가 줄고 일관성이 올라감."
 
-## 5. TLS 인증 · HTTPS 핸드셰이크
-정의: TLS = 암호화 + 무결성 + 인증. TCP 위, HTTP 아래.
-인과: 암호화만으론 상대가 진짜인지 모름 → 인증서(신원 증명) 필요.
-키 역할: 비대칭(RSA/ECDHE)=키 교환용(느림), 대칭(AES)=본 통신용(빠름).
-인증서 체인: CA가 서명. Root CA(내장 trust store)→중간 CA→서버 인증서 검증.
-- SNI: 한 IP 여러 도메인일 때 ClientHello에 도메인 명시 → 맞는 인증서 제시.
-- 폐기 확인: CRL / OCSP / OCSP Stapling(성능↑)
-버전:
-- TLS 1.2 = 2-RTT.
-- TLS 1.3 = 1-RTT(+재접속 0-RTT). ECDHE 강제 → Forward Secrecy. 레거시(RSA키교환/RC4/SHA-1) 제거. 0-RTT는 재전송 공격 위험 → 멱등 요청만.
-사슬: DNS → TCP 3-way → TLS(인증서 검증+키 합의→세션키) → HTTP 암호화 전송.
-진단: 신뢰불가=체인끊김/자체서명 / 도메인불일치=SAN / 특정클라 실패=버전·cipher / 엉뚱한 인증서=SNI 미전송 / 느림=OCSP Stapling
+## 5. GPT 프롬프트 구조화 — 개인화 질문 생성
+"AI 연동은 했는데 왜 그렇게 프롬프트를 짰나"를 설명할 수 있어야 함.
 
----
+### A. 두 단계 분리 설계
+한 번에 "저널 보고 질문 내줘"가 아니라 **추출 → 생성** 두 단계로 분리:
+1. **extractProfile** (저널 → UserProfile): 누적 저널에서 독서 패턴을 구조화된 JSON으로 추출. 결과를 DB에 저장(캐시 역할).
+2. **generateQuestions** (책 + UserProfile → 질문 3개): 저장된 프로파일을 참조해 현재 책에 맞는 질문 생성.
 
-## 5-1. HTTPS 전 과정 정리 (인증 ↔ 데이터 교환 분리)
-핵심: 비대칭키(인증)는 핸드셰이크 앞부분에서만, 대칭키(데이터)는 핸드셰이크 종료 후에만 쓴다. 두 영역은 쓰는 키도 목적도 완전히 다르다.
-세 가지 역할 구분(가장 헷갈리는 지점):
-- 서버 신원 인증 = 서버 개인키로 서명 → 공개키로 검증. 핸드셰이크 단계. 비대칭.
-- 비밀키 나눠 갖기 = 임시 DH 키쌍으로 각자 계산. 핸드셰이크 단계.
-- 실제 데이터 암복호화+무결성 = 대칭키(비밀키) 하나. 암호화=복호화 동일 키. 핸드셰이크 후.
-※ 흔한 오해: "데이터 무결성 검증에 공개키가 등장한다" → 아니다. 데이터 단계엔 공개키가 안 나온다. 무결성도 대칭키로 처리(HMAC / AES-GCM 인증 태그). "해시를 비밀키로 암호화해서 보내고 공개키로 되돌린다"는 그림은 대칭키와 비대칭키가 섞인 잘못된 시나리오다.
+분리 이유:
+- 프로파일은 "자주 바뀌지 않는 패턴"이라 매 요청마다 재계산 불필요 → DB 캐시.
+- 질문은 "책마다 달라야" 하므로 매번 생성 → 단, 유저 문맥(프로파일)은 재사용.
+- 관심사 분리: 프로파일 추출 프롬프트와 질문 생성 프롬프트가 독립적으로 개선 가능.
 
-TLS 1.3 순서 (처음부터 끝까지):
-1. Client Hello (클라 → 서버): 암호화 알고리즘·해시함수 목록 제안 + 클라이언트 임시 DH 공개값 던짐.
-2. Server Hello (서버 → 클라): 알고리즘 하나 선택 + 서버 임시 DH 공개값 던짐.
-3. 서버가 신원 증명 자료 전송 (서버 → 클라):
-   - Certificate: 인증서(도메인, 유효기간, 서버 공개키, CA의 signature 포함).
-   - CertificateVerify: 지금까지 오간 메시지(+DH 공개값)를 서버 개인키로 서명.
-4. 클라이언트가 서버 인증 검증(서명 검증이 두 번 나옴 ★):
-   - ① 인증서 진위: 인증서 원문 해싱 + signature를 CA(발급기관) 공개키로 복호화한 해시 비교 → "인증서 위조 아님". (서버 공개키가 아니라 CA 공개키로 검증한다.)
-   - ② 인증서 주인 확인: CertificateVerify를 인증서 안의 서버 공개키로 검증 → "인증서 주인 = 지금 이 서버, DH값도 진짜 서버 것".
-5. 양쪽이 비밀키 계산 (각자 독립): 클라(내 임시 개인키 + 서버 임시 공개값 → 비밀키), 서버(내 임시 개인키 + 클라 임시 공개값 → 비밀키) → 수학적으로 양쪽 동일한 비밀키(대칭키) 완성. 여기까지가 핸드셰이크.
-6. 실제 데이터 통신 (핸드셰이크 종료 후): 이후 모든 데이터(HTML, 로그인 정보 등)는 이 비밀키 하나로만 암복호화하고, 무결성도 이 키로 검증(AES-GCM 태그 등). 공개키/개인키는 서랍에 넣고 안 씀.
+### B. 프롬프트 철학 — "분석 앱이 아님"을 명시
+질문 생성 시스템 프롬프트의 핵심 규칙:
+```
+1. Start from the book. (책에서 출발)
+2. Use the user profile only as a light supporting reference. (프로파일은 보조)
+3. Do NOT make psychological claims about the user.
+4. The user should feel "this app is thoughtful" — not "this app is analyzing me."
+```
+이 규칙 없이 프롬프트를 짜면 GPT가 "당신은 내성적인 성향이 있어서..." 식의 심리 분석 투 질문을 생성함. Butter는 독서 기록 앱이므로 이 경계를 시스템 프롬프트 레벨에서 명확히 차단.
 
-연결고리(별개지만 이어짐): DH 자체는 상대가 누군지 신경 안 씀 → 중간자가 서버인 척 자기 공개값을 던질 수 있음. 그래서 서버가 CertificateVerify에서 DH 공개값까지 개인키로 서명 → "지금 DH 하는 상대가 진짜 서버다"를 보증. 인증(앞방)이 데이터 교환(뒷방)의 상대를 검증해 주는 문지기.
-한 줄 요약: 룰·DH 공개값 교환(1,2) → 서버가 진짜인지 인증(3,4) → 각자 같은 비밀키 계산(5) → 그 비밀키 하나로 실제 데이터 빠르게 주고받기(6).
-앞 5단계까지가 "안전하고 진짜인 상대와 비밀키 맞추기", 6단계가 "그 비밀키로 본 게임". 비대칭키(인증)는 앞에서만, 대칭키(데이터)는 뒤에서만 쓰입니다.
+볼륨 레벨별 개인화 강도 조절:
+- `readingVolumeLevel === "low"`: 책 자체 중심, 개인화 최소.
+- `"mid"`: 최근 독서 패턴과 가볍게 연결.
+- `"high"`: 장기 패턴과 연결하되 과도한 개인화 금지.
+→ 데이터가 없을 때 억지 개인화하지 않는 안전장치.
 
----
+### C. 타입 안전 파싱
+GPT 응답은 항상 `JSON.parse` 후 필드별 타입 검증:
+```typescript
+readingVolumeLevel: ["low","mid","high"].includes(parsed.readingVolumeLevel)
+  ? parsed.readingVolumeLevel : "low",
+recentEmotions: Array.isArray(parsed.recentEmotions) ? parsed.recentEmotions : [],
+```
+GPT 응답이 스키마를 벗어나도 앱이 깨지지 않도록. 마크다운 코드블록(`\`\`\`json`) 자동 제거도 포함.
 
-## 6. URL 입력하면 벌어지는 일 (순서)
-1.URL 파싱 2.캐시/HSTS 확인 3.DNS(브라우저→OS→hosts→ISP 재귀→Root→TLD→권한NS) 4.ARP(게이트웨이 MAC) 5.TCP 3-way 6.TLS 핸드셰이크 7.HTTP 요청 8.서버 처리(리버스 프록시→WAS→DB) 9.렌더링 10.keep-alive/종료
-계층: DNS(L7)→ARP(L2)→TCP(L4)→TLS(L6)→HTTP(L7)
-지연 포인트: DNS 지연 / TCP RTT / TLS 왕복 / TTFB / 렌더 블로킹
+## 6. 유저 성향 관리 — UserProfile 스키마 설계
+```
+model UserProfile {
+  userId               String   @unique  // User당 1개, upsert
+  readingVolumeLevel   String            // low | mid | high
+  recentEmotions       String[]          // 반복 감정 패턴
+  dominantThemes       String[]          // 반복 주제
+  writingStyleSignal   String            // introspective | factual | emotional
+  notableFragments     String[]          // 유저 특유의 표현 단편
+  recentBookCategories String[]          // 최근 읽은 장르
+  sourceEntryCount     Int               // 기반 엔트리 수
+  profileVersion       Int               // 갱신마다 +1
+  promptVersion        String            // 프롬프트 버전 추적 ("1.0")
+  generatedAt          DateTime          // 마지막 GPT 생성 시각
+}
+```
+★ 설계 포인트 3가지:
+(a) **성격이 아니라 독서 경험 패턴만 추출**: `recentEmotions`는 책 읽을 때 느낀 감정, `dominantThemes`는 독서 주제. "내성적", "예민한" 같은 성격 판단은 추출 금지 — 시스템 프롬프트에서 명시적으로 막음.
+(b) **promptVersion 추적**: 프롬프트를 개선하면 버전을 올리고, 서버에서 `profile.promptVersion !== PROMPT_VERSION`이면 재생성. "코드 배포"와 "데이터 갱신"을 연결하는 버전 관리.
+(c) **upsert 패턴**: 엔트리 5개 이상일 때만 프로파일 생성/갱신. 데이터 부족한 초기 유저에게 억지 개인화하지 않음.
 
----
+`notableFragments`는 유저가 자주 쓰는 표현 단편("딱히 없었다", "먹먹했다")을 저장. 질문 생성 시 이 표현 톤과 비슷한 언어로 질문을 생성하도록 GPT에 힌트 제공.
 
-## 7. VPN
-정의: 암호화 터널로 트래픽을 VPN 서버까지 감싸 보냄. 원래 IP 패킷을 통째로 캡슐화+암호화.
-인과: 통째 캡슐화 → 새 헤더 → MTU 감소 → MSS clamping 필요.
-효과: 도청 방지 / 출발지 IP 은폐 / 사내망 접근. 프로토콜: IPsec(L3), WireGuard, OpenVPN.
+## 7. 데이터 시각화 — 5종 탭 구현
+"어떻게 다양하게 구현했나"를 구체적으로. 전부 `d3.js` + 클라이언트 계산.
 
----
+### 서재(Shelf) 탭
+책 목록을 테이블로 정렬(최신/가나다/작가/분류). `useMemo`로 entries → bookFreq Map 집계.
 
-## 8. 프록시 vs 리버스 프록시
-정의: 포워드 = 클라이언트 대신(클라 앞). 리버스 = 서버 대신(서버 앞).
-포워드: 사내 통제/캐싱/익명화/차단. 서버는 프록시 IP만 봄.
-리버스(핵심): 클라가 진짜 서버로 착각. 역할 = 로드밸런싱 / TLS 종료 / 캐싱 / 보안(실서버 은폐, WAF) / 라우팅. Nginx, HAProxy, LB.
-- TLS 종료: 리버스 프록시가 TLS 대신 처리 → 뒤 실서버는 평문 HTTP.
-대비: "포워드는 클라를 숨기고, 리버스는 서버를 숨긴다."
+### 잡지(Magazine) 탭
+각 저널 감상을 10종 카드 스펙 시퀀스(`CARD_SPECS`)로 flex-wrap 배치. 카드마다 고유한 너비(280~680px), 표지 크기(XS~XL), 표지 위치(left/right/top/none)가 달라 "패션 잡지 편집 레이아웃" 효과. `justify-content: center`로 카드들이 가운데로 모임.
 
----
+### 워드클라우드(WordCloud) 탭
+`d3-cloud` 라이브러리로 감상 텍스트에서 단어 빈도 추출 → 나선형 배치. 한국어 조사·불용어 필터링 (`STOP_KO` 집합). `ResizeObserver`로 컨테이너 크기 변경 시 재렌더.
 
----
+### 악보(Score) 탭
+X축 = 날짜, Y축 = 감정 축(emotion × 도서). 날짜별로 도트를 놓고 선으로 연결. 감정이 여러 날짜에 걸쳐 연속되면 선이 이어지고, 끊기면 단절됨. 독서 감정의 시간적 흐름을 악보처럼 표현.
 
-## 9. 스위치·라우터·MAC·ARP·DNS (패킷의 여정)
-스위치 vs 라우터:
-정의: 스위치(L2)=같은 네트워크 내 MAC으로 프레임 전달. 라우터(L3)=다른 네트워크 간 IP로 경로 결정.
-인과: 서브넷 마스크로 "같은 네트워크냐" 판단 → 같으면 스위치, 다르면 게이트웨이(라우터).
-후속: 스위치=MAC 테이블 학습, 라우터=라우팅 테이블. 모르면 스위치는 flooding, 라우터는 default route.
+### 아크(Arc) 탭
+책과 감정을 노드로, 연결 빈도를 아크 두께로 표현하는 바이파타이트 그래프.
+- **모바일**: 노드를 Y축(세로)에 배치, 아크가 좌우로 뻗는 반타원.
+- **PC**: 노드를 X축(가로)에 배치, 아크가 위로 솟는 반타원. `isMobile` 감지로 분기.
+- **감정별 고유 색상**: 10색 팔레트로 각 감정을 구분 (이전엔 진하기로만 구분 → 색상 추가).
+- **호버 인터랙션**: 특정 노드에 마우스 올리면 연결된 아크만 강조, 나머지 희미하게. `data-base-opacity` 속성으로 원래 opacity 저장 후 복원.
 
-MAC & ARP:
-정의: MAC=NIC 하드웨어 주소(같은 네트워크 한정). ARP="이 IP의 MAC이 뭐냐"를 브로드캐스트로 알아냄(IP→MAC).
-핵심: IP는 종단까지 고정, MAC은 홉마다 바뀜. 밖으로 나갈 땐 ARP로 게이트웨이 MAC 획득(서버 MAC 아님).
-후속: ARP 캐시 / ARP Spoofing(가짜 응답 MITM) / GARP(장애 절체 광고).
+★ 공통 구현 패턴:
+- `ResizeObserver` + `useState(dims)` → 컨테이너 크기 변경 시 SVG 재계산.
+- `useMemo`로 entries 집계 분리 — 렌더마다 재계산 방지.
+- `useEffect` deps에 `dims` 포함 → 크기 변경 시 d3 효과 재실행.
 
-DNS:
-정의: 도메인→IP 분산 계층형 이름 시스템.
-인과: 클라는 재귀 리졸버에 "답만 다오"(재귀), 리졸버가 Root→TLD→권한NS 반복 질의.
-후속: A/AAAA/CNAME/MX/NS/TXT / TTL(낮추면 변경 빨리·부하↑) / UDP 53(크면 TCP 53).
+## 8. 구현상 난점 — 실제로 막혔던 것들
 
-ICMP/ping/traceroute:
-정의: ICMP=IP계층 제어·오류 통보(데이터 운반 아님). ping=생존+RTT, traceroute=경로 홉 추적.
-traceroute 원리: TTL을 1,2,3...로 늘려 각 홉의 "시간초과 ICMP"로 경로 발견.
-후속: ping 실패 ≠ 서비스 다운(ICMP만 막았을 수도) / ICMP 전면차단→PMTUD 블랙홀.
+### (1) 크로스도메인 인증 — 쿠키 vs Bearer 토큰
+Vercel(프론트)↔Railway(백엔드)는 도메인이 달라서 `httpOnly` 쿠키가 크로스사이트에서 전송 안 됨. 처음엔 쿠키만 발급했는데 프로덕션에서 모든 인증 요청이 401.
+해결: 로그인 응답 body에 `token` 필드 추가 → 프론트가 `localStorage`에 저장 → 이후 모든 요청에 `Authorization: Bearer` 헤더. 쿠키도 유지(로컬 개발 호환). `getToken()`은 localStorage → 쿠키(httpOnly: false 전환 후) 순으로 fallback.
 
-패킷의 여정: DNS로 IP→서브넷 판단→(원격이면)ARP로 게이트웨이 MAC→프레임 전송(IP고정,MAC 홉마다 교체)→라우터가 다음 홉 반복 결정.
+### (2) RouterProvider와 Context 차단
+React Router v7의 `RouterProvider`는 외부 `Context.Provider`에서 값을 받지 못하는 문제. `<LocaleContext.Provider><RouterProvider /></LocaleContext.Provider>` 구조로 감쌌는데 locale 전환이 반영 안 됨.
+해결: `LocaleContext.Provider`를 `RouterProvider` 안에 넣어야 함. `RootLayout` 컴포넌트 안에 `useState(locale)`을 이동시켜 라우터 트리 내부에서 Context 제공. Login 페이지도 별도로 로컬 Provider 적용.
 
----
+### (3) Neon DB idle 연결 끊김
+Neon Serverless PostgreSQL은 일정 시간 사용 없으면 연결을 끊음. 이후 첫 요청에서 Prisma가 `P1017(Connection closed)` 에러를 던지고 500 반환.
+해결: Prisma `$extends`로 전역 쿼리 미들웨어 추가. `P1001/P1002/P1017` 및 "Connection"/"closed" 메시지 감지 시 최대 3회, 600ms 간격으로 `$connect()` 재시도 후 쿼리 재실행.
 
-## 전체 인과 사슬
-계층 분리→진단축 / L4가 신뢰성(3-way, SEQ/ACK) / 얼마나=min(rwnd,cwnd) / 한 번에=MSS
-어긋나면 → 연결(TIME/CLOSE_WAIT), 버퍼(Zero Window), 경로(PMTUD), 큐(Bufferbloat)
-한문장: "TCP는 3-way로 연결, SEQ/ACK로 신뢰성·순서 보장, 전송량은 min(rwnd,cwnd), 단위는 MSS. 트러블은 연결상태/버퍼/경로크기/큐 넷 중 하나."
+### (4) 모바일 반응형 — 책 상세 페이지
+PC에서 12컬럼 그리드(좌 4 / 우 8)가 모바일에서 찌그러지는 문제. 단순히 col-span 수정으론 해결 안 됨 — 레이아웃 자체가 달라야 함.
+해결: `md` 브레이크포인트로 **두 개의 완전히 다른 JSX**를 렌더. 모바일은 "커버 상단 → 제목 → 버튼 → 같은 작가 → 본문 → 카드 → 같은 장르"의 세로 단일 컬럼. 데스크탑은 기존 2단 그리드. `hidden md:block` / `block md:hidden`으로 분기.
+
+### (5) 저널 기록물 단순 텍스트 문제
+6단계 구조로 작성했는데 보관함에서 볼 때는 평문으로 나열되어 "작성 경험"과 "보기 경험"의 괴리가 큼.
+해결: content 저장 포맷을 `[시작]\n내용\n\n[구절]\n내용` 구조로 정의. 보관함 뷰에서 `parseSections(content)`로 파싱 → 단계별 Q&A 인터뷰 형식으로 렌더. 각 단계에 `01/02/03` 인덱스와 원래 질문 텍스트를 희미하게 표시해 "작성 당시의 감성"을 재현.
+
+## 9. 면접 포인트 요약
+1. **AI 연동 두 단계 분리**: extractProfile(캐시) + generateQuestions(매번). "매번 GPT 부르지 않고 프로파일을 캐시"하는 구조.
+2. **프롬프트 가드레일**: "분석 앱이 아님"을 시스템 프롬프트 레벨에서 강제. AI 응답 품질을 프롬프트 구조로 제어.
+3. **Book soft link**: 외부 API 데이터를 신뢰하지 않고 스냅샷 비정규화. "DB 직접 참조 vs 비정규화 스냅샷"의 트레이드오프 선택 근거.
+4. **시각화 5종 클라이언트 전담**: 서버 계산 vs 클라이언트 계산의 경계 판단.
+5. **크로스도메인 인증 삽질**: 쿠키가 안 되는 이유와 Bearer 전환 이유.
+6. **RouterProvider Context 차단 버그**: 프레임워크 내부 동작을 이해하고 구조로 우회.
+7. **UserProfile promptVersion**: 프롬프트 개선과 데이터 재생성을 버전으로 연결하는 엔지니어링 감각.
+
+## 10. 핵심 요약
+독서 저널 + AI 개인화 + 5종 데이터 시각화. 책 연결은 외부 API soft link + 스냅샷 비정규화. GPT는 extractProfile(캐시) → generateQuestions(책별 생성) 두 단계. 프롬프트는 "독서 경험 패턴만, 심리 분석 금지"를 명시적으로 제한. 시각화 5종은 전부 d3.js 클라이언트 처리. 크로스도메인 인증은 Bearer 헤더로 해결. RouterProvider Context 차단은 RootLayout 내부 이동으로 해결.
 
 </script>
 

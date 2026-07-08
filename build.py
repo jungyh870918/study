@@ -36,6 +36,8 @@ KIND_META = {
     "sqlmastery":         {"label": "SQL 실전 범위","desc": "실제 프로젝트 쿼리로 본 다뤄본 범위",           "color": "#155e75"},
     "authimpl":           {"label": "인증 구현",    "desc": "JWT·리프레시 로테이션·OAuth·가드 실제 코드",  "color": "#be123c"},
     "glossary":           {"label": "용어 체크리스트","desc": "상식 수준 용어 — 한 줄로 설명 가능해야",     "color": "#0d9488"},
+    "whiteboard":         {"label": "화이트보드",  "desc": "그려보세요 요청 — ERD·아키텍처·흐름도",       "color": "#7c2d12"},
+    "stackdeep":          {"label": "스택 심화",    "desc": "라이브러리 동작 원리·구현 디테일",          "color": "#4338ca"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -50,16 +52,18 @@ TOPIC_LABEL = {
     "frontend": "인증·프론트엔드",
     "domain": "도메인 설계 사례",
     "codeit": "코드잇 알고리즘 실습",
+    "dsimpl": "자료구조 직접 구현",
     "ds": "자료구조·알고리즘",
     "os": "운영체제",
     "voyage": "프로젝트: Voyage",
     "jceye": "프로젝트: 병원결제(Next)",
     "allscape": "프로젝트: 감리시스템(SQL)",
     "authsrv": "프로젝트: 인증서버(Nest)",
+    "butter": "프로젝트: Butter",
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary", "whiteboard", "stackdeep"]
 
 
 def parse_filename(fn):
@@ -370,8 +374,24 @@ def main():
     if not docs:
         print("md/ 에 마크다운 파일이 없습니다.")
         return
-    # 문서 정렬: 번호순 (이전/다음 네비게이션 순서)
-    docs.sort(key=lambda d: d["num"])
+    # 문서 정렬: 인덱스 페이지의 그룹 배치와 동일하게 (이전/다음 네비게이션 순서)
+    # (1) 공통 문서(topic=None) 먼저, (2) 토픽이 처음 등장하는 번호순으로 그룹,
+    # (3) 그룹 내에서는 KIND_ORDER → 번호순. 이렇게 해야 prev/next가 목차 순서와 일치.
+    _topic_first = {}
+    for d in docs:
+        t = d["topic"]
+        if t is not None and t not in _topic_first:
+            _topic_first[t] = d["num"]
+
+    def _nav_key(d):
+        if d["topic"] is None:
+            # 공통 문서: 맨 앞, 번호순
+            return (0, d["num"], 0, 0)
+        group_rank = _topic_first[d["topic"]]
+        kind_rank = KIND_ORDER.index(d["kind"]) if d["kind"] in KIND_ORDER else 99
+        return (1, group_rank, kind_rank, d["num"])
+
+    docs.sort(key=_nav_key)
 
     search_index = [{
         "title": d["short"], "kind": d["meta"]["label"],
