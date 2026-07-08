@@ -40,6 +40,9 @@ KIND_META = {
     "stackdeep":          {"label": "스택 심화",    "desc": "라이브러리 동작 원리·구현 디테일",          "color": "#4338ca"},
     "dbprisma":           {"label": "Prisma 기본",  "desc": "셋업·스키마·쿼리·트랜잭션",                  "color": "#0e7490"},
     "serialization":      {"label": "직렬화",      "desc": "서버↔클라 데이터 통신·plain object",        "color": "#0f172a"},
+    "gotcha":             {"label": "허 찌르는 질문","desc": "경험·버전·선택 트레이드오프 대비",          "color": "#b45309"},
+    "dto":                {"label": "DTO 설계",    "desc": "DTO·엔티티·Zod·Enum 일관 규칙",             "color": "#0369a1"},
+    "styling":            {"label": "스타일링",    "desc": "SCSS·Handlebars·Tailwind 커스텀",          "color": "#db2777"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -65,7 +68,7 @@ TOPIC_LABEL = {
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary", "whiteboard", "stackdeep", "dbprisma", "serialization"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary", "whiteboard", "stackdeep", "dbprisma", "serialization", "gotcha", "dto", "styling"]
 
 
 def parse_filename(fn):
