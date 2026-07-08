@@ -74,12 +74,28 @@
 - ★ 경계 설계: 데이터 조회·정적 부분=서버 컴포넌트, 상호작용=클라이언트 컴포넌트로 분리.
 - (구) Pages Router: pages/ 기반, getServerSideProps/getStaticProps. 레거시지만 여전히 씀.
 
-### C4. 라우팅
-- 파일 기반: app/about/page.tsx → /about.
-- 동적 라우트: [id]/page.tsx → /123. [slug]는 SEO용 이름, [...all] 캐치올.
-- 라우트 그룹: (marketing)처럼 괄호 폴더 → URL에 안 나타나고 레이아웃만 구획.
-- 링크 이동: <Link href="/about"> (클라 네비+prefetch, <a>는 전체 리로드).
-- 프로그래밍 이동: useRouter().push(). 서버에선 redirect(), 404는 notFound().
+### C4. 라우팅 — 정의 방식 (React Router vs Next)
+★ 근본 차이: React Router는 "라우트를 코드에 선언", Next는 "파일 구조가 곧 라우트".
+React(react-router-dom): 라이브러리 설치 후 <Route path element>로 매핑을 코드에 나열.
+  <Routes><Route path="/about" element={<About/>} /><Route path="/product/:id" .../></Routes>
+  동적 파라미터 :id, 읽기 useParams(). 404는 path="*".
+Next(App Router): 폴더/파일 구조가 URL. 설치·선언 불필요.
+- 폴더=경로 세그먼트, page.tsx=그 경로의 페이지. app/about/page.tsx → /about.
+- [id]=동적 라우트. product/[id]/page.tsx → /product/123. 읽기: 서버 컴포넌트는 params props, 클라는 useParams().
+- [slug]=SEO용 이름, [...all]=캐치올(여러 세그먼트).
+- layout.tsx=하위 공통 레이아웃(중첩 가능). (그룹)=괄호 폴더, URL에 안 나타남(구획용).
+- 특수 파일: loading.tsx(로딩 UI), error.tsx(에러 UI), not-found.tsx(404).
+
+### C4-B. 페이지 이동 방식 (6가지)
+(1) <Link href> — 선언적(클릭). 전체 리로드 없이 클라 전환 + 자동 prefetch(뷰포트에 보이면 미리 로드). 대부분의 링크.
+(2) useRouter().push() — 명령형(로직 중 이동, 폼 성공 후 등). 'use client' 필요, next/navigation에서 import(구 Pages Router는 next/router — 헷갈리지 말 것).
+    - push(히스토리 쌓임) / replace(히스토리 교체, 로그인 후) / back()·forward() / refresh(서버 데이터 재요청).
+(3) redirect('/login') — ★ 서버 사이드 이동(서버 컴포넌트·서버 액션). React엔 없음. JS 로드 전 서버 단에서 이동→깜빡임 없음. 권한 체크에.
+(4) notFound() — 서버에서 404 강제 트리거(리소스 없을 때).
+(5) 미들웨어 NextResponse.redirect — 페이지 도달 전 요청 단계 이동. 전역 인증 게이트.
+(6) <a> — 일반 링크(전체 리로드). 외부 링크에만.
+언제 무엇: 클릭=Link / 로직 중=push / 히스토리 안 남기기=replace / 서버 권한 차단=redirect / 404=notFound / 전역 인증=미들웨어.
+React Router 대응: <Route>→파일구조 / useNavigate()→useRouter().push() / useParams()→params·useParams() / redirect·notFound·미들웨어=Next 고유(서버 사이드).
 
 ### C5. 데이터 처리 (App Router)
 - 서버 컴포넌트에서 직접 fetch/DB 조회: async function Page() { const data = await getData(); }.
@@ -99,6 +115,18 @@
 - middleware.ts: 요청이 페이지 도달 전 실행(엣지). 인증 검사·리다이렉트·A/B·헤더 조작.
 - 라우트 단에서 접근 제어(로그인 필요·관리자 전용).
 
+### C8. Next가 React 대비 개선/차별화한 것 (★ 빈출)
+React는 UI 라이브러리라 나머지를 직접 조립. Next는 프레임워크로 통합+개선. 거의 다 "서버를 활용한다"는 한 뿌리.
+1. 렌더링(가장 큰 차이): React=CSR(브라우저 렌더, 초기 느림·SEO 불리) / Next=서버 렌더(SSR/SSG) 가능→첫 화면 빠름·SEO 유리, 페이지별 전략 선택.
+2. 서버 컴포넌트: React=모든 컴포넌트가 클라 번들에 포함 / Next=조회·정적 부분은 서버 실행, 그 JS는 클라에 안 감→번들 경량화. 상호작용만 'use client'.
+3. 라우팅: React=react-router 설치+<Route> 선언 / Next=파일 기반 내장 + 서버 사이드 이동(redirect/notFound).
+4. 데이터 페칭: React=useEffect로 마운트 후 fetch(깜빡임) / Next=서버 컴포넌트가 렌더 전 미리 조회, 변경은 서버 액션(API 없이).
+5. 최적화 내장: 이미지(<Image> 자동 WebP·lazy)·폰트(next/font)·코드분할(라우트별 자동)·prefetch가 기본. React는 라이브러리로 조립.
+6. 풀스택: React=프론트만(백엔드 별도) / Next=Route Handler·서버 액션으로 백엔드가 한 프로젝트에.
+7. 기타: layout.tsx 중첩 레이아웃, 미들웨어(요청 단계, React엔 없음—서버가 없으니), 메타데이터 API(SEO를 서버에서, React는 react-helmet).
+한 장 요약: React=UI 라이브러리·CSR·클라 번들·라우터 설치·useEffect fetch·별도 백엔드 / Next=풀스택·SSR선택·서버컴포넌트·파일라우팅·서버조회·내장백엔드·미들웨어.
+★ 핵심 통찰: "React + 서버 = Next". React는 브라우저에서만 도는 UI라 렌더링·SEO·데이터·백엔드가 클라 한계에 묶이는데, Next가 서버 레이어를 얹어 서버렌더·서버컴포넌트·서버액션·미들웨어·redirect가 가능해진 것. 대부분의 차별점이 이 하나로 설명됨.
+
 ## D. 렌더링·성능 용어 (프론트 공통)
 - Hydration: 서버가 보낸 정적 HTML에 JS를 붙여 상호작용 가능하게 만드는 과정. SSR 후 클라에서 일어남.
 - CLS(Cumulative Layout Shift): 로딩 중 레이아웃이 밀리는 정도(이미지 크기 지정·폰트로 개선).
@@ -117,6 +145,9 @@
 - "서버 컴포넌트?" → App Router 기본. 서버에서 렌더+데이터 조회, JS 번들 미포함. 상호작용은 'use client'로 분리.
 - "Hydration?" → SSR HTML에 JS를 입혀 상호작용 가능하게 만드는 과정.
 - "상태관리 도구 선택?" → 서버 상태 React Query, 클라 전역 Redux/Zustand, 로컬 useState.
+- "React Router와 Next 라우팅 차이?" → React Router는 <Route>로 코드 선언, Next는 파일·폴더 구조가 곧 라우트(내장).
+- "Next에서 페이지 이동?" → 클릭은 <Link>(prefetch), 로직 중은 useRouter().push(), 서버 권한 차단은 redirect(), 404는 notFound().
+- "Next가 React보다 나은 점?" → 서버 렌더(SEO·속도), 서버 컴포넌트(번들↓), 파일 라우팅, 서버 조회·서버 액션(백엔드 내장), 이미지/폰트 최적화. 핵심은 "React+서버".
 
 ## 핵심 요약
 React=선언형·컴포넌트·Virtual DOM·단방향·Hooks. 상태는 불변으로. Next=React 풀스택(라우팅·SSR/SSG/ISR·SEO·최적화 내장). App Router는 서버 컴포넌트 기본+'use client' 경계, 데이터는 서버 컴포넌트(조회)/서버 액션(변경)/Route Handler(외부). 최적화는 next/image·link·font·코드분할·메타데이터가 기본. 상태관리는 서버=React Query·클라=Redux/Zustand 역할 분담.

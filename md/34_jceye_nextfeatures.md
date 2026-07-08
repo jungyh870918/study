@@ -219,3 +219,36 @@ export const signInFormSchema = z.object({
 - 서버 액션/서버 함수에서 fetch로 외부 API 직접 호출→api 폴더 불필요. 시크릿 키는 서버 전용 환경변수로 노출 방지. 내부 흐름=서버 액션, 외부→우리=Route Handler.
 - Next 고유: useRouter/redirect/notFound(next/navigation), <Image>(최적화), <Link>(클라 네비), next/font, revalidatePath(캐시 무효화), 메타데이터 API.
 - zod: 런타임 스키마 검증+타입 추론. 클라(zodResolver)+서버(parse) 양쪽 재사용. "경계 검증" 원칙(NestJS DTO와 같은 역할).
+
+---
+
+## 15. 서버 액션 심화 — 호출 위치·본질·Route Handler와의 차이 ★
+질문에서 자주 헷갈리는 3가지 정리.
+
+### 호출 위치 — 클라/서버 양쪽 다 (오해 주의)
+- ★ 실행 위치와 호출 위치는 별개다. 실행은 항상 서버(고정), 호출은 클라이언트 컴포넌트·서버 컴포넌트 둘 다 가능.
+- 오히려 클라이언트 컴포넌트('use client')에서 호출이 흔하다: 폼 제출·버튼 클릭 같은 상호작용(onClick/onSubmit)은 클라에서만 가능→그 안에서 서버 액션 호출.
+  'use client'; const res = await createOrder(data); router.push(res.redirectTo);  // 클라에서 서버 액션 호출
+- 서버 컴포넌트에선 주로 <form action={createOrder}>로 연결(JS 없이 동작, 프로그레시브 인핸스먼트).
+- ★ "서버에서 실행"이 "서버 컴포넌트에서 호출"이란 뜻이 아니다. 클라에서 불러도 몸통은 서버에서 돎.
+- 구분: 조회(읽기)=서버 컴포넌트가 렌더하며 직접(서버 액션 아님) / 변경(쓰기)=서버 액션, 주로 클라 상호작용에서 호출.
+
+### 본질 — 결국 HTTP 요청
+- 겉보기엔 함수 호출이지만 내부적으로 Next가 자동 생성한 엔드포인트로 POST 요청을 보낸다. 네트워크 탭에 실제 POST가 찍힘.
+- 즉 주소가 외부로 노출 안 될 뿐, 본질은 Route Handler(api 폴더 REST 라우터)와 같은 클라이언트-서버 HTTP 통신. URL을 우리가 직접 명명하지 않고 액션 ID로 자동 생성될 뿐.
+
+### Route Handler와 실제로 다른 점 (동작은 같아도)
+- 보일러플레이트: 서버 액션=함수 만들고 import해 호출(자동). Route Handler=route.ts 작성+URL 정의+fetch+JSON 직렬화/파싱 수동.
+- 타입: 서버 액션=함수 직접 import라 인자·반환 타입 자동 연결(타입 안전). Route Handler=네트워크 건너며 타입 끊김→수동으로 맞춤.
+- 폼 통합: 서버 액션=useFormStatus/useActionState로 pending 자동, <form action> 직접 연결. 
+- URL 노출: 서버 액션=명시적 URL 없음→우리 앱 내부만 호출. Route Handler=공개 URL→외부(웹훅·서드파티)도 호출 가능.
+표 요약:
+| | Server Action | Route Handler |
+| 본질 | HTTP 요청(같음) | HTTP 요청(같음) |
+| URL | 자동·숨김 | 명시적·공개 |
+| 호출 주체 | 내부만 | 외부도 가능 |
+| 개발 | import, 보일러플레이트 없음 | 엔드포인트 수동 |
+| 타입 | 자동 연결 | 수동 |
+| 적합 | 내부 폼·CRUD | 웹훅·공개 API |
+★ 선택 기준: 내부 변경=Server Action(편의·타입), 외부가 호출=Route Handler(공개 URL·제어). 이 프로젝트가 토스 confirm=클라가 URL로 부르니 Route Handler, 환불·PayPal=내부 흐름이니 서버 액션으로 가른 이유.
+면접 한 문장: "서버 액션도 내부적으론 자동 생성 엔드포인트로 가는 POST라 본질은 Route Handler와 같은 HTTP 통신이다. 다만 URL이 숨겨져 내부 전용이고, 함수를 직접 import하니 보일러플레이트 없이 타입이 자동 연결된다. 그래서 내부 폼·CRUD는 서버 액션, 웹훅처럼 외부가 부르는 건 Route Handler로 구분한다."
