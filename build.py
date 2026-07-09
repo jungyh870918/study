@@ -43,6 +43,7 @@ KIND_META = {
     "gotcha":             {"label": "허 찌르는 질문","desc": "경험·버전·선택 트레이드오프 대비",          "color": "#b45309"},
     "dto":                {"label": "DTO 설계",    "desc": "DTO·엔티티·Zod·Enum 일관 규칙",             "color": "#0369a1"},
     "styling":            {"label": "스타일링",    "desc": "SCSS·Handlebars·Tailwind 커스텀",          "color": "#db2777"},
+    "reactnative":        {"label": "React Native", "desc": "React와의 차이·네이티브 컴포넌트·모바일 생태계", "color": "#0284c7"},
 }
 DEFAULT_KIND = {"label": "문서", "desc": "학습 문서", "color": "#0b8a8f"}
 
@@ -68,7 +69,7 @@ TOPIC_LABEL = {
 }
 
 # 분류 정렬 우선순위(카드 나열 순서)
-KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary", "whiteboard", "stackdeep", "dbprisma", "serialization", "gotcha", "dto", "styling"]
+KIND_ORDER = ["basic", "supplement", "essentials", "checkquestions", "practical", "overview", "techdeep", "dbaccess", "backendfiles", "nextfeatures", "sqlmastery", "authimpl", "glossary", "whiteboard", "stackdeep", "dbprisma", "serialization", "gotcha", "dto", "styling", "reactnative"]
 
 
 def parse_filename(fn):
