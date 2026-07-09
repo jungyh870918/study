@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>프로젝트 Voyage · 학습 허브</title>
+<title>상식 수준 용어 체크리스트 · 학습 허브</title>
 <!-- ============================================================
      이 페이지 갱신법:
        (권장) md/ 파일 수정 후  python3 build.py  재실행.
@@ -49,8 +49,8 @@
     <nav class="doc-nav">
       <a href="index.html">⌂ index</a>
       <span class="spacer"></span>
-      <a href="doc_32_voyage_dbaccess.html">← 프로젝트 Voyage</a>
-      <a href="doc_37_voyage_stackdeep.html">프로젝트 Voyage →</a>
+      <span></span>
+      <a href="doc_00_tech_association.html">기술 연상 사전 →</a>
     </nav>
     <article class="prose" id="doc-body"></article>
   </main>
@@ -63,69 +63,60 @@
      (주의: 본문에 </script> 문자열이 있으면 <\/script> 로 적어야 함 — 거의 없음)
      ============================================================ -->
 <script type="text/markdown" id="doc-source">
-# [문서33] 프로젝트 Voyage — 백엔드 파일 역할 분류
-> 문서31의 파일 구성을 실제 코드로 검증·분류. 전체 37개 .py / 55,730줄.
-> ★ 문서31과 다른 발견: 미참조 레거시 5개, content.py가 전체의 88%(데이터).
+# [문서] 상식 수준 용어 체크리스트 — 한 줄로 설명 가능해야
+> 경력직이면 "이 정도는 당연히" 나오는 기본 용어. 깊이 파는 게 아니라 들었을 때 바로 반응+한 줄 설명.
+> 기준: 각 용어를 한 문장으로 설명할 수 있는가? 막히면 그 개념부터 복습.
 
 ---
 
-## 핵심 한 줄
-"FastAPI 라우트를 가진 파일은 main.py 단 하나. 나머지는 라이브러리 모듈 아니면 오프라인 스크립트. 런타임 표면적은 작고(main+조회/채점/음원/STT+core), 코드의 88%(content.py 49k줄)는 '로직'이 아니라 콘텐츠 데이터. batches→content.py→migrate→DB→content_db 단방향 흐름."
+## 🌐 네트워크
+프로토콜·계층: TCP/UDP, IP, HTTP/HTTPS, HTTP/2·3, TLS/SSL, DNS, OSI 7계층, TCP/IP 4계층
+TCP 동작: 3-way/4-way handshake, TIME_WAIT, 흐름 제어, 혼잡 제어, MTU/MSS
+HTTP: 메서드(GET/POST/PUT/PATCH/DELETE), 상태코드(2xx/3xx/4xx/5xx), 헤더, 쿠키/세션, 멱등성, REST, stateless
+보안·주소: CORS, CSRF, XSS, 방화벽, 포트, 공인/사설 IP, NAT, 프록시(포워드/리버스), 로드밸런서
+응용: WebSocket, gRPC, GraphQL, CDN, VPN, ARP, 소켓
+한 줄 테스트:
+- TIME_WAIT → 연결 종료 후 잔여 패킷 처리 위해 잠깐 대기하는 상태.
+- 멱등성 → 같은 요청 여러 번 보내도 결과 같음(GET/PUT 멱등, POST 아님).
+- CORS → 다른 출처(프로토콜+도메인+포트) 요청을 브라우저가 막는 정책.
+- 3-way handshake → SYN→SYN/ACK→ACK로 연결 수립.
+- REST → 자원을 URL로, 행위를 HTTP 메서드로 표현하는 stateless API 스타일.
 
-## A. 콘텐츠 생성 / 데이터 파이프라인 (오프라인)
-- services/content.py (49,042줄): 콘텐츠 원본 데이터 배열(대사·표현·발음·리액션). 런타임 미로드, migrate 소스.
-- migrate_content.py (235): content.py→lessons 테이블 upsert(ALTER 생SQL+ORM add/update).
-- generate_all.py (241): 음원 배치 자동생성(TTS→믹싱→timeline).
-- push_quality_scores.py (71): 채점 결과(json)를 DB 반영.
-- rebuild_reaction/fix_pronunciation/fix_reaction (346/84/85): E시리즈 포맷 변환·재구성.
-- upload_existing_audio/upload_illustrations (160/121): 음원·삽화 R2 일괄 업로드.
-- generate_card_webp (94): 삽화 WebP 변형+LQIP blur 생성.
-- regen_illustrations_32/regen_swap/crop_replace (104/104/107): 삽화 재생성·crop·R2 교체.
-- insert_sample_records (121): 학습 달력 테스트용 샘플 DB 삽입.
-★ content.py 49,042줄 = 전체 코드의 88%. 면접에서 반드시 "이건 로직이 아니라 데이터"라고 명확히. "코드 5.5만 줄"이 아니라 "데이터 소스가 대부분, 실제 로직은 작다."
+## 🗄️ 데이터베이스
+인덱스·쿼리: 인덱스, B+Tree, 클러스터드/논클러스터드, 복합 인덱스, 커버링 인덱스, 카디널리티, 풀스캔, EXPLAIN(실행계획), 옵티마이저
+트랜잭션: 트랜잭션, ACID, 커밋/롤백, 격리 수준(4종), 락(공유/배타), 데드락, MVCC, 낙관적/비관적 락
+설계: 정규화(1~3NF), 반정규화, PK/FK, 참조 무결성, 스키마, 관계(1:1/1:N/N:N)
+조인·기법: INNER/LEFT/RIGHT/OUTER JOIN, 서브쿼리, CTE(WITH), GROUP BY, HAVING, 집계함수, UNION, 손익분기점
+운영·확장: 복제, 샤딩, 파티셔닝, 커넥션 풀, N+1, 슬로우 쿼리, WAL, 백업/복구
+SQL vs NoSQL: 관계형/문서형/키-값, ACID vs BASE, 최종/강한 일관성
+한 줄 테스트:
+- 카디널리티 → 컬럼 값의 다양성. 높을수록 인덱스 효과 큼.
+- N+1 → 목록 1번+각 행 연관 조회 N번으로 쿼리 폭증.
+- MVCC → 락 대신 버전 스냅샷으로 읽기·쓰기 동시성 확보.
+- 정규화 → 중복 제거 위해 테이블 나누고 FK로 연결.
+- 샤딩 → 데이터를 여러 DB에 수평 분할(쓰기 확장).
+- 커버링 인덱스 → 쿼리에 필요한 컬럼이 인덱스에 다 있어 테이블 안 봐도 됨.
 
-## B. 런타임 — 라우팅 + 비즈니스 로직
-- app/main.py (1,676): 유일한 FastAPI 앱. 47개 엔드포인트(음원 서빙, 레슨 조회, 채점 /api/score, STT, 유저 동기화, 통계/스트릭, 북마크/플레이리스트/스케줄/메모/노트/프로필).
-- api.py (3): from app.main import app — 배포 진입점(ASGI).
-- services/content_db.py (103): 런타임 콘텐츠 조회 계층. lessons 테이블→dict. main.py가 content.py 대신 이걸 씀.
-- services/scoring.py (235): 발화 채점(표면유사도+코사인+키워드 cap). STT 벤더와 분리.
-- services/audio_pipeline.py (655): 7단계 학습 음원 파이프라인(화자 보이스 매핑, timeline 빌드).
-- services/share_page.py (288): /s/{lesson_id} 공유 페이지 HTML 렌더.
+## 🧮 알고리즘·자료구조
+복잡도: 시간/공간 복잡도, Big-O, 최악/평균/최선, O(1)/O(log n)/O(n)/O(n log n)/O(n²)/O(2ⁿ)
+자료구조: 배열, 연결 리스트, 스택(LIFO), 큐(FIFO), 덱, 해시테이블, 트리, BST, 힙, 그래프, 트라이
+정렬·탐색: 버블/선택/삽입, 퀵, 병합, 힙 정렬, 안정 정렬, 이진 탐색, 선형 탐색
+기법: 재귀, 분할 정복, DP, 그리디, 백트래킹, 완전 탐색, 투 포인터, 슬라이딩 윈도우, 메모이제이션
+그래프: DFS, BFS, 다익스트라, 최단 경로, MST, 위상 정렬, Union-Find
+해시·기타: 해시 함수, 해시 충돌, in-place, 재귀 vs 반복
+한 줄 테스트:
+- 스택 vs 큐 → 스택 LIFO(후입선출), 큐 FIFO(선입선출).
+- DP → 겹치는 부분 문제를 저장해 재계산 없이 푸는 것.
+- 이진 탐색 → 정렬된 배열을 반씩 줄여 O(log n)으로 찾기.
+- 해시 충돌 → 다른 키가 같은 해시값. 체이닝/개방주소법으로 해결.
+- DFS vs BFS → 깊이 우선(스택/재귀) vs 너비 우선(큐, 최단거리).
+- 안정 정렬 → 같은 값의 원래 순서 유지(병합 O, 퀵 X).
+- 그리디 → 매 순간 최선 선택. 항상 최적은 아님(반례 확인 필요).
 
-### ⚠️ 미참조 레거시 (코드 확인됨 — 정직하게 말할 카드)
-- services/session_builder.py (71): 어디서도 import 안 됨 → 초기 Dialogue 설계 잔재.
-- services/pm6r_builder.py (256): 미참조 → audio_pipeline으로 대체된 듯.
-- services/db_service.py (86): 미참조 → 초기 Dialogue 모델용 레거시.
-
-## C. 외부 연동 / 인프라 (core)
-- core/tts_service.py (228): ElevenLabs TTS 래퍼+캐시.
-- core/r2_storage.py (115): Cloudflare R2(S3호환) 업로드/URL/존재확인.
-- services/stt_client.py (137): OpenAI Whisper STT+임베딩(컨테이너 sniff, ffmpeg wav 변환).
-- app/db.py (79): DB 엔진 — Railway PG 주/Neon 폴백/SQLite 로컬.
-- app/models_db.py (202): SQLAlchemy 모델 14종.
-- app/init_db.py (43): create_all+ALTER 컬럼 보강.
-- core/models.py (110): dataclass/Enum 도메인 타입.
-- core/cache.py (2): TTSService 재-export shim.
-★ 벤더 격리: tts_service/r2_storage/stt_client가 외부 API를 각각 얇은 래퍼로 분리. "벤더 교체 시 이 파일만 갈아끼운다"는 설계. scoring도 STT 벤더와 분리.
-
-## D. 유틸 (보조 — 현 런타임 연결 불명확)
-- core/chunker.py (95): 문장→청크 분할. 레거시 빌더만 사용.
-- core/templates.py (108): 학습 스텝 템플릿. 참조처 없음 → 레거시.
-- utils/mixer.py (32): TTS+BGM 믹싱(pydub). import 안 됨 → 오프라인/잔재.
-
-## E. 오프라인 스크립트 / 테스트
-- test_scoring.py (67): 채점 곡선 검증(실 임베딩으로 점수 분포).
-- test_meta_regression.py (115): 메타 채점 회귀 테스트(메타 ON/OFF 비교).
-- _check_step2.py (102): 콘텐츠 검증(레슨 108개, practice 키, assert). content.py 직접 로드하는 유일한 곳.
-
-## 면접 포인트 (이 분류에서 나오는 이야기)
-1. 런타임 표면적은 작다. 실제 서버가 도는 코드는 main.py+content_db/scoring/audio_pipeline/share_page/stt_client+core(tts/r2/db/models). content.py(49k)는 데이터 소스. → "코드량"이 아니라 "런타임에 실제 도는 것"으로 규모를 말하는 게 정확.
-2. 벤더 격리 설계. 외부 API(TTS/STT/R2)를 각각 얇은 래퍼로. 교체 시 그 파일만.
-3. 데이터 흐름 단방향. batches/*.json→content.py→migrate→DB→content_db(런타임 조회). DB 직접 수정 안 함(SSOT). 문서30·31의 원칙과 코드가 일치.
-4. 레거시 잔재를 정직하게. pm6r_builder·session_builder·db_service·templates·mixer는 현 런타임 미참조. 초기 "PM6R/Dialogue" 설계가 현재 audio_pipeline+lessons 테이블로 전환된 흔적. → 물으면 "구조 전환의 흔적, 정리 대상으로 인지하고 있다"로 답하는 게 오히려 신뢰(모르는 척하거나 "다 쓴다"고 하면 역효과).
-
-## 핵심 요약
-main.py 단일 FastAPI(47라우트). content.py는 88%가 데이터. 런타임=조회/채점/음원/STT+core. 외부 API는 얇은 래퍼로 벤더 격리. 흐름은 batch→content→migrate→DB→content_db 단방향. 미참조 레거시 5개는 PM6R/Dialogue 초기 설계의 잔재로 인지 중.
+## 활용법
+- 각 용어를 한 줄로 설명해보고, 막히면 해당 분야 문서로.
+- 면접에서 이 용어들은 "설명"이 아니라 "반응" 대상 — 나오면 즉시 알아듣고 한 줄로 받아치기.
+- 깊이는 후속 질문에서. 여기 있는 건 "당연히 아는" 바닥 상식선.
 
 </script>
 

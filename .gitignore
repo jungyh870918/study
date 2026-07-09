@@ -1,0 +1,4 @@
+# OS / 배포 잔여물
+.DS_Store
+*.zip
+__MACOSX/
