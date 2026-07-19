@@ -61,6 +61,7 @@ TOPIC_LABEL = {
     "dsimpl": "자료구조 직접 구현",
     "ds": "자료구조·알고리즘",
     "os": "운영체제",
+    "git": "Git 협업",
     "voyage": "프로젝트: Voyage",
     "jceye": "프로젝트: 병원결제(Next)",
     "allscape": "프로젝트: 감리시스템(SQL)",
